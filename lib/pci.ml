@@ -1,5 +1,4 @@
 open Core
-open Printf
 
 type hw = Memory.virt
 
