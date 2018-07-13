@@ -10,7 +10,6 @@
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
 #include <caml/alloc.h>
-#include <caml/bigarray.h>
 #include <caml/fail.h>
 #include <caml/signals.h>
 
@@ -163,4 +162,3 @@ CAMLprim value caml_write8(value virt, value offset, value v) {
     *((volatile uint8_t *) (((char *) virt) + Long_val(offset))) = (uint8_t) Long_val(v);
     CAMLreturn(Val_unit);
 }
-
