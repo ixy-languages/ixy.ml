@@ -1,0 +1,22 @@
+(jbuild_version 1)
+
+(executable
+ ((name check_nic)
+  (public_name check_nic)
+  (modes (native))
+  (libraries (core ixy))
+  (modules (check_nic))))
+
+(executable
+ ((name memory)
+  (public_name memory)
+  (modes (native))
+  (libraries (core ixy))
+  (modules (memory))))
+
+(executable
+ ((name mmap)
+  (public_name mmap)
+  (modes (native))
+  (libraries (core ixy))
+  (modules (mmap))))

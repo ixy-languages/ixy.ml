@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library 
+ ((name ixy)
+  (public_name ixy)
+  (libraries (core))
+  (preprocess (pps (ppx_deriving.enum)))
+  (c_names (uname memory))))
