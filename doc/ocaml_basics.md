@@ -207,6 +207,7 @@ let third_character = my_string.[2] (* third_character = 'l' *)
 
 Records are similar to structs in C.
 They are basically tuples with named members.
+Unlike tuples they can have mutable members.
 
 ```ocaml
 type my_record_t = {
@@ -216,6 +217,25 @@ type my_record_t = {
 }
 
 let my_record : my_record_t = { a = 1; b = 3.1415; c = "this is a string" }
+
+(* in-place update of mutable fields *)
+my_record.b <- 2. *. my_record.b (* '+.', '-.', '*.' and '/.' are float operators *)
+
+(* immutable update (copy) *)
+let my_other_record : my_record_t = { my_record with a = 7; c = "also a string" }
+```
+
+Mutable references are actually implemented using mutable records:
+```ocaml
+type 'a ref = {
+  mutable contents : 'a
+}
+
+let ref x = { contents = x }
+
+let ( := ) r v = r.contents <- v
+
+let ( ! ) r = r.contents
 ```
 
 #### Variant
