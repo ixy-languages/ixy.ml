@@ -98,7 +98,7 @@ function
 | hd :: tl -> hd
 ```
 
-### Polymorphy
+### Polymorphism
 
 `'a` (pronounced alpha) indicates a polymorphic type, similar to `<T>` in Java.
 
