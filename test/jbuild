@@ -20,3 +20,18 @@
   (modes (native))
   (libraries (core ixy))
   (modules (mmap))))
+
+(executable
+ ((name uname)
+  (public_name uname)
+  (modes (native))
+  (libraries (ixy))
+  (modules (uname))))
+
+(executable
+ ((name caml_string)
+  (public_name caml_string)
+  (modes (native))
+  (libraries (ixy))
+  (modules (caml_string))))
+
