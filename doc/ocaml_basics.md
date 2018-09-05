@@ -70,24 +70,79 @@ square 2
 let add2 : int -> int = add 2
 ```
 
+### Function definition with named and optional parameters
+
+OCaml supports both named and optional function parameters.
+Named parameters are prefixed with `~` and can be given in any order as long as the label is also given.
+
+Optional parameters can either have a default value or be of type `'a option`.
+
+```ocaml
+let rec apply_n_times ~n ~f x =
+  if n < 1 then
+    x
+  else
+    apply_n_times ~n:(n - 1) ~f (f x)
+```
+
 ### Lambda
 
 ```ocaml
 fun x -> x + 1 (* function that maps each integer to its successor *)
 ```
 
-### Pattern matching
+### `if` statement
+
+`if` statements are actually expressions.
 
 ```ocaml
-match v with
-| [1; x; 2] -> x (* match lists with three elements, starting with 1 and ending with 2 *)
-| [] -> 0 (* match empty list *)
-| 7 :: _ -> 11 (* match any list starting with a 7 *)
-| (35 as hd) :: _ -> hd (* introduce a label hd *)
-| hd :: _ when hd mod 2 = 0 -> hd (* pattern with guard *)
-| 11 :: 17 :: _
-| 1 :: _ -> 100 (* match two different patterns *)
-| _ -> 10 (* wildcard pattern that matches any value *)
+if 3 > 4 then
+  7
+else
+  8
+```
+
+### `while` and `for` loops
+
+```ocaml
+let counter = ref 10 in
+while !counter > 0 do (* ! is the dereference operator, not the negation operator *)
+  print_endline "still looping...";
+  counter := !counter - 1 (* could write decr counter instead *)
+done
+
+for i = 0 to 10 do (* both bounds are inclusive, i.e. i ∊ [0, 10] *)
+  print_int i;
+  print_newline ()
+done
+
+for i = 10 downto 0 do
+  print_int i;
+  print_newline ()
+done
+```
+
+### Pattern matching
+
+Pattern matching is used to deconstruct composite values.
+Patterns are commonly found in `match <expr> with <pattern> -> <expr>`, `function <pattern> -> <expr>` and as the left-hand-side of a `let`-binding.
+
+```ocaml
+let f v =
+  match v with
+  | [1; x; 2] -> x (* match lists with three elements, starting with 1 and ending with 2 *)
+  | [] -> 0 (* match empty list *)
+  | 7 :: _ -> 11 (* match any list starting with a 7 *)
+  | (35 as thirtyfive) :: _ -> thirtyfive (* introduce a label thirtyfive *)
+  | hd :: _ when hd mod 2 = 0 -> hd (* pattern with guard *)
+  | 11 :: 17 :: _ | 1 :: _ -> 100 (* match two different patterns *)
+  | _ -> 10 (* wildcard pattern that matches any value *)
+
+let g (a, b) = a + b (* deconstruct a tuple *)
+
+let h = function (* decide between two variants *)
+  | None -> 0
+  | Some i -> i
 ```
 
 ### Lambda with pattern matching
@@ -110,6 +165,35 @@ let rec len list = (* rec indicates that this function is recursive *)
 ```
 `len` has type `'a list -> int`.
 
+### Main function
+
+Unlike most programming languages OCaml has no `main` function.
+Instead each OCaml compilation unit (each file) is evaluated and executed from top to bottom.
+The order in which compilation units are executed is the same order in which they were linked.
+Usually programmers will write no top-level statements besides a single `let` binding that binds to nothing and simply calls a function that serves as a main entrypoint, like so:
+```ocaml
+let main () =
+  print_endline "Hello, world!"
+
+let _ =
+  main () (* just call main with argument () and ignore the result *)
+```
+
+`let _ = <something>` simply evaluates `<something>` and ignores the result.
+Since an executable program works via its side-effects there is no information returned from the entrypoint.
+This leads to a common pattern being `let () = <something>` which during compilation checks that `<something>` evaluates to the type `unit` whose only value is `()`.
+This prevents programs whose entrypoints return some value from compiling, since returning some value is often caused by a forgotten function argument.
+Consider the following example:
+```ocaml
+let main () =
+  print_endline (* OH NO! we forgot the argument to print_endline *)
+
+let () =
+  main ()
+```
+This program will not compile since the type of `main ()` is `string -> unit` instead of `unit`.
+This way the bug is caught during compilation.
+
 ## Types
 
 ### Basic types
@@ -126,9 +210,7 @@ OCaml has a number of integrated basic types.
 * `string` immutable string
 * `bytes` mutable string
 
-### Complex types
-
-#### Function
+### Functions
 
 ```ocaml
 let add_3_values a b c = a + b + c
@@ -149,6 +231,9 @@ assert (1 %& 2 = 1 + 2) (* assertions are rarely used *)
 ```
 Functions whose names are inside `(` and `)` and consist only of [these characters](http://caml.inria.fr/pub/docs/manual-ocaml/lex.html#sec83) are infix/prefix operators.  
 In this case we defined our own `+` operator: `%&`.
+
+
+### Composite types
 
 #### Mutable reference
 
@@ -242,6 +327,7 @@ let ( ! ) r = r.contents
 
 Variants are sum types (tagged unions) and consist of a number of different alternatives.
 Each variant can optionally contain another type.
+Variant names are called "constructors" and need to be capitalized.
 
 ```ocaml
 type my_variant =
@@ -275,6 +361,314 @@ type 'a list =
 This is the actual definition of the list type in OCaml.
 A list can contain values of any type (`'a`) but all values have to have the same type.
 
+## Modules
+
+OCaml programs and Libraries are usually subdivided into modules.
+An OCaml source file `my_module.ml` gets compiled to a module `My_module`.
+Note that the name automatically gets capitalized; every module name must start with a capital letter.
+
+Please note that modules are much more powerful than the examples shown here; this serves only as an introduction.
+Modules can be transformed to first class values, parameterized over other modules (such modules are known as `functor`s) and even inherit other modules' functionality (`include` keyword).
+
+Modules can also contain other modules using the following syntax:
+```ocaml
+module My_module = struct
+  type t = int
+
+  let x = 1
+
+  let y = 17
+end
+```
+
+Module signatures look like this:
+```ocaml
+module My_module : sig
+  type t = int
+
+  val x : t
+
+  val y : t
+end
+```
+
+Modules signatures can be added to the module definition instead of or in addition to in `.mli` files:
+```ocaml
+module My_module : sig
+  type t = int
+
+  val x : t
+
+  val y : t
+end = struct
+  type t = int
+
+  let x = 1
+
+  let y = 17
+end
+```
+
+Module members can be accessed via standard dot-notation: `My_module.x`.
+
+Module signatures are usually used to hide implementation details such as types or internally used utility functions.
+
+### Example
+
+The following program shows a simple implementation of complex arithmetic:
+```ocaml
+open Core
+
+module Complex : sig
+  type t
+
+  val create : real:float -> imaginary:float -> t
+
+  val to_string : t -> string
+
+  val add : t -> t -> t
+
+  val mul : t -> t -> t
+
+  val conjugate : t -> t
+end = struct
+  type t = {
+    real : float;
+    imaginary : float
+  }
+
+  let create ~real ~imaginary =
+    { real; imaginary }
+
+  (* immediately deconstruct the argument *)
+  let to_string { real; imaginary } =
+    if not Float.is_non_positive imaginary then
+      Printf.sprintf "%f + %fi" real imaginary
+    else
+      Printf.sprintf "%f - %fi" real (Float.neg imaginary)
+
+  let add a b =
+    { real = a.real +. b.real;
+      imaginary = a.imaginary +. b.imaginary
+    }
+
+  let mul a b =
+    let real =
+      (a.real *. b.real) -. (a.imaginary *. b.imaginary) in
+    let imaginary =
+      (a.imaginary *. b.real) -. (a.real *. b.imaginary) in
+    { real; imaginary }
+
+  (* partial deconstruction and renaming in pattern matching *)
+  let conjugate ({ imaginary; _ } as c) =
+    { c with imaginary = Float.neg imaginary }
+end
+
+let () =
+  let a = Complex.create ~real:10. ~imaginary:(-20.) in
+  let b = Complex.create ~real:7. ~imaginary:0. in
+  Printf.printf
+    "a: %s\nb: %s\na + b: %s\na * b: %s\n"
+    (Complex.to_string a)
+    (Complex.to_string b)
+    Complex.(to_string (add a b)) (* "A.(<expr>)"" opens module "A" in <expr> *)
+    Complex.(to_string (mul a b))
+```
+
+When run, the program produces this output:
+```
+a: 10.000000 - 20.000000i
+b: 7.000000 + 0.000000i
+a + b: 17.000000 - 20.000000i
+a * b: 70.000000 - 140.000000i
+```
+
+Note that the internal implementation of the type `Complex.t` is hidden.
+This obviously requires the constructor `Complex.create`, otherwise no values of type `Complex.t` could be created.
+
+### Alternative example
+
+The signature of the `Complex` module could also have been the following:
+```ocaml
+module Complex : sig
+  type t = private {
+    real : float;
+    imaginary : float
+  }
+
+  val create : real:float -> imaginary:float -> t
+
+  val to_string : t -> string
+
+  val add : t -> t -> t
+
+  val mul : t -> t -> t
+
+  val conjugate : t -> t
+end
+```
+
+Note the `private` keyword.
+This prevents other modules from creating values of type `Complex.t`, though now they can deconstruct them (i.e. access the members `real` and `imaginary`) since their internal implementation is exposed.
+
+## Objects
+
+In addition to an extremely powerful module system OCaml also offers a somewhat unusual object and class system.
+In fact, the "O" in "OCaml" stands for "Objective".
+
+In reality the object system is rarely used; usually modules are the preferred abstraction method.
+
+### Objects
+
+Objects can be created without classes or any prior type definitions:
+```ocaml
+let x =
+  object
+    val x = 10
+
+    method get_x = x
+  end
+```
+
+Objects are enclosed in `object` and `end`.
+Their instance variables are defined using `val` instead of `let`.
+Methods are defined similar to functions, though unlike functions they are evaluated everytime they're called, therefore they don't require a `unit` argument.
+Unlike most languages that use dot-notation to access methods, methods in OCaml are called using `#`.
+Instance variables can optionally be defined as `mutable`.
+
+Note that even though they appear in the object's type signature, instance variables are never visible outside the object; setters and getters are always required if access to instance variables is required.
+
+Objects can optionally refer to themselves using a programmer-chosen name:
+```ocaml
+let x =
+  object (self)
+    val mutable x = 10
+
+    method get_x = x
+
+    method set_x new_x = x <- new_x
+
+    method print_and_update new_x =
+      Printf.printf "old x: %d\n" x;
+      self#set_x new_x
+  end
+```
+
+In this example the object could call its own methods using `self`; the equivalent in Java would be `this`.
+By convention `self` is used, though any non-keyword can be used, e.g. `object (this) ... end` or `object (me) ... end` would also work.
+
+Since there is no need for a constructor, if an object needs to perform some other initialization, the programmer can define a special `initializer` method that is called upon instantiation:
+```ocaml
+let x =
+  object (self)
+    val mutable x = 10
+
+    method get_x = x
+
+    method set_x new_x = x <- new_x
+
+    method print_and_update new_x =
+      Printf.printf "old x: %d\n" x;
+      self#set_x new_x
+
+    initializer
+      Printf.printf "created object with x = %d\n" x
+  end
+```
+
+### Classes
+
+Classes can be thought of as functions returning objects, though they don't necessarily take arguments.
+
+A basic class looks like this:
+```ocaml
+class my_class =
+  object
+    val x = 7
+
+    method get_x = x
+  end
+```
+
+Objects of this class can be instantiated using the `new` keyword:
+```ocaml
+let () =
+  let my_object = new my_class in
+  Printf.printf "my_object's x has the value %d\n" my_object#get_x
+```
+
+Let's write a basic integer container class:
+```ocaml
+class int_container i =
+  object (self)
+    val mutable content = i
+
+    method get_int = content
+
+    method set_int new_i = content <- new_i
+
+    method twice =
+      self#set_int (2 * self#get_int)
+  end
+```
+
+Objects of this class start with an initial value given during construction and can be updated at any point:
+```ocaml
+let print_content container =
+  Printf.printf "%d\n" container#get_int
+
+let () =
+  let container = new int_container 17 in
+  print_content container;
+  container#set_int 800;
+  print_content container;
+  container#twice;
+  print_content container
+```
+
+### Inheritance
+
+Let's demonstrate inheritance by creating a parameterized container class and then specializing it for our `int_container`:
+```ocaml
+(* the class container is parameterized over the polymorphic type 'a *)
+class ['a] container init =
+  object
+    (* explicit type annotation is necessary here, otherwise content could have some other type 'b *)
+    val mutable content : 'a = init
+
+    method get_content = content
+
+    method set_content new_content = content <- new_content
+  end
+
+class int_container init =
+  object (self)
+    inherit [int] container init
+
+    method twice =
+      self#set_content (2 * self#get_content)
+  end
+
+class string_container init =
+  object (self)
+    inherit [string] container init
+
+    method length = (* pointless example method *)
+      String.length self#get_content (* could also access instance variable content directly *)
+  end
+```
+
+### Virtual classes
+
+Classes that cannot be instantiated into objects and only exist to be inherited are usually called "abstract", in OCaml they are called `virtual`.
+
+Classes can be entirely `virtual` or have `virtual` methods. (TODO check this)
+
+### Structural typing
+
+Unlike all other values in OCaml, objects are structurally typed.
+Any object can be used in place of any other object as long as it supports this object's methods. (TODO check this)
+
 ## Common practices
 
 ### Indentation
@@ -298,125 +692,20 @@ let f : float = Float.of_int i
 let f : float = Int.to_float i
 ```
 
-## Memory representation of values
+### Modules
 
-OCaml values are always exactly one machine word in size (usually 32 or 64 bit).
-An OCaml value (type `value` in C) is either a 63-bit integer (lowest bit set to 1), a pointer to the OCaml heap or a pointer to some other memory.
+Just as any other language it is common practice to subdivide programs into small and easy-to-understand modules.
 
-### Integer
+Oftentimes modules obviate the need for objects (the "O" in OCaml stands for "Objective") given that object functionality can be sufficiently emulated using modules.
 
-A signed integer `n` is represented as `(n << 1) + 1`.
-There are no unsigned integers.
-
-### Variants (without members)
-
-Variants without members are represented as integers. They are numbered starting from zero in the order they appear in in the type definition.
-
-```ocaml
-type my_type =
-  | A (* represented as 0 *)
-  | B of int (* represented as a block *)
-  | X (* represented as 1 *)
-  | Y (* represented as 2 *)
-  | Z (* represented as 3 *)
-```
-
-### String
-
-```ocaml
-let bla = "ab"
-```
-is represented as
-```
-+---+---+---+---+
-|hdr|'a'|'b'|pad|
-+---+---+---+---+
-      ^
-      |
-     bla
-```
-
-An OCaml string is a pointer to a block of memory containing the characters of the string.
-The pointer points to the first character of the string.
-
-To the "left" of the first character there is a header one word in size.
-The header contains the size of the string as well as some metadata for the garbage collector.
-The string is always padded to the next word with the number of padding bytes preceding the last padding byte stored in the last padding byte, all other padding bytes are null bytes.
-The padding for the example string `bla` is `"\x00\x00\x00\x00\x00\x05"` since there are 5 padding bytes preceding the last padding byte.
-
-OCaml strings can be passed to C functions, although they may contain null characters that will be interpreted as the end of the string by the standard C functions such as `strcmp` or `strcpy`.
-
-### Composite values
-
-Composite values (tuples, variants with members, records, arrays, etc.) are represented as pointers to blocks.
-Boxed values (`int64`, `int32`, `float`, etc.) are also represented as blocks.
-A block consists of a header as well as a number of "fields".
-Both the header and each field are one word in size.
-
-```ocaml
-let x = 1L (* suffix L -> int64; l -> int32; n -> nativeint *)
-```
-is represented as such
-```
-+---+---+
-|hdr|i64|
-+---+---+
-      ^
-      |
-      x
-```
-
-## Foreign Function Interface
-
-OCaml offers a foreign function interface (ffi) that allows OCaml programs to call C functions and vice versa. Fortran is also supported. This tutorial only covers calls from OCaml to C.
-
-### Declaring a C function in OCaml
-
-```ocaml
-external add_int_and_float : int -> float -> float = "caml_add_int_and_float"
-(* C functions that are called from OCaml are commonly prefixed with "caml_" *)
-```
-
-### Using a foreign function
-
-Foreign functions are used exactly like standard OCaml functions. Partial application works.
-
-```ocaml
-let f : float = add_int_and_float 10 3.14
-let add27 : float -> float = add_int_and_float 27
-let f : float = add27 f (* shadowed variable *)
-```
-
-### Implementing OCaml-compatible C functions
-
-```c
-#define CAML_NAME_SPACE // prevent namespace collisions
-
-#include <caml/memory.h> // CAMLreturn etc.
-#include <caml/mlvalues.h> // conversion macros
-#include <caml/alloc.h> // OCaml heap allocation
-
-// CAMLprim - OCaml primitive
-// value - type of OCaml values (integers/pointers)
-CAMLprim value caml_add_int_and_float(value i, value f) {
-    // GC needs to know about these values
-    CAMLparam2(i, f);
-    // Long_val() - conversion macro, read "long integer of value"
-    // OCaml integers are actually long integers
-    long c_long = Long_val(i);
-    // Double_val() - conversion macro, read "double of value"
-    double c_double = Double_val(f);
-    // CAMLreturn instead of return
-    // caml_copy_double() allocates a new float on the OCaml heap
-    CAMLreturn(caml_copy_double(c_double + c_long));
-}
-```
+Modules oftentimes define their own type (see the `Complex` module in the [**Modules**](#modules) section).
+This central type of the module is by convention called `t`, accessed by other modules as `Module_name.t`, and instantiated using a `create` function.
 
 ## Resources
 
 ### OCaml manual
 
-[The OCaml manual](http://caml.inria.fr/pub/docs/manual-ocaml/) is the language reference. It details the language, the runtime, the ffi and all language extensions.
+[The OCaml manual](http://caml.inria.fr/pub/docs/manual-ocaml/) is the language reference. It details the language, the runtime, the foreign function interface and all language extensions.
 
 ### Real World OCaml
 
