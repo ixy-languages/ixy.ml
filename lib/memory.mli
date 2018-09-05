@@ -2,9 +2,11 @@ open Core
 
 type virt
 
-type dma_memory = {
+val nullptr : virt
+
+type dma_memory = private {
   virt : virt;
-  phy : int64
+  phys : int64
 }
 
 type prot =
@@ -46,10 +48,48 @@ val allocate_dma : ?require_contiguous:bool -> int -> dma_memory
 
 val test_string : string -> unit
 
+val read64 : virt -> int -> int64
+
+val write64 : virt -> int -> int64 -> unit
+
 val read32 : virt -> int -> int
 
 val write32 : virt -> int -> int -> unit
 
+val read16 : virt -> int -> int
+
+val write16 : virt -> int -> int -> unit
+
 val read8 : virt -> int -> int
 
 val write8 : virt -> int -> int -> unit
+
+val offset_ptr : virt -> int -> virt
+
+val make_ocaml_string : virt -> int -> string
+
+val get_string : unit -> virt
+
+val c_dump_memory : string -> virt -> int -> unit
+
+val dump_memory : string -> virt -> int -> unit
+
+val malloc : int -> virt
+
+type mempool
+
+val allocate_mempool : ?entry_size:int -> num_entries:int -> mempool
+
+type pkt_buf
+
+val pkt_buf_resize : pkt_buf -> int -> unit
+
+val pkt_buf_get_data : pkt_buf -> bytes
+
+val pkt_buf_get_phys : pkt_buf -> int64
+
+val pkt_buf_alloc_batch : mempool -> num_bufs:int -> pkt_buf array
+
+val pkt_buf_alloc : mempool -> pkt_buf option
+
+val pkt_buf_free : pkt_buf -> unit
