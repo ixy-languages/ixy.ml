@@ -27,11 +27,3 @@
   (modes (native))
   (libraries (ixy))
   (modules (uname))))
-
-(executable
- ((name caml_string)
-  (public_name caml_string)
-  (modes (native))
-  (libraries (ixy))
-  (modules (caml_string))))
-

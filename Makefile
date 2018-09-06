@@ -1,4 +1,4 @@
-all: memory check_nic mmap uname caml_string
+all: memory check_nic mmap uname
 
 memory:
 	jbuilder build test/memory.exe
@@ -11,9 +11,6 @@ mmap:
 
 uname:
 	jbuilder build test/uname.exe
-
-caml_string:
-	jbuilder build test/caml_string.exe
 
 clean:
 	jbuilder clean
