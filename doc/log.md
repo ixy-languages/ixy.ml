@@ -2,13 +2,13 @@
 
 ixy.ml has builtin logging functionality which is turned on by default.
 
-If you wish to reduce logging simply set `Log.log_level` to `INFO`, `WARNING` or `ERROR`; if you wish to turn off logging entirely set it to `STFU`.
+If you wish to reduce logging, simply set `Log.log_level` to `INFO`, `WARNING` or `ERROR`; if you wish to turn off logging entirely, set it to `STFU`.
 
-If you want to send your own debug, info, warning or error messages use the functions from the `Log` module.
+If you want to send your own debug, info, warning or error messages, use the functions from the `Log` module.
 
-If you don't want colored output set `Log.color` to `false`.
+If you don't want colored output, set `Log.color` to `false`.
 
-If you want to redirect the logging output use `Log.out_channel`.
+If you want to redirect the logging output, use `Log.out_channel`.
 
 ## Example
 

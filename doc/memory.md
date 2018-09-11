@@ -191,6 +191,10 @@ If this bit is not set the NIC had to split the packet up into multiple buffers 
 
 Bits 32 through 47 of the second word of the write-back format indicate the received packet's length in bytes.
 
+## Transmit Descriptors (tx descriptors)
+
+(TODO add this section)
+
 ## Descriptor Ring
 
 Descriptors for a queue are stored in a so-called descriptor ring.
@@ -221,8 +225,8 @@ The user program periodically calls `rx_batch` to receive a batch of packets.
 If this bit is set, we know that the NIC has placed a packet in the buffer the descriptor points to.
 To prepare the packet for the user program we need to set its size.
 The NIC stored the packet's size in the size field of the descriptor.
-After fetching the size the packet buffer needs to be resized by modifying the OCaml string header's size field and writing the appropriate padding.
-Now the packet is done and its spot in the descriptor ring needs to be filled by a new empty packet buffer.
+After fetching the size, the packet buffer needs to be resized by modifying the OCaml string header's size field and writing the appropriate padding.
+Now the packet is done and its spot in the descriptor ring needs to be filled with a new empty packet buffer.
 
 Once we have reached a descriptor whose DD bit isn't set, we have received all packets.
 Now we just need to update the tail pointer to tell the hardware up to which point there are empty buffers in the ring.
@@ -230,10 +234,11 @@ We only update the tail pointer once to prevent unnecessary overhead from repeat
 
 ## Transmit flow
 
+Like rx queues, tx queues maintain a descriptor ring.
+
 ### Setup phase
 
 During tx setup the driver initializes a number of tx queues.
-Like rx queues, tx queues maintain a descriptor ring.
 Head and tail pointers are also set to 0.
 The tx setup is somewhat simpler than the rx setup, since there are no descriptors in the descriptor ring initially.
 Descriptors will be added once the user program calls `tx_batch` with a number of packet buffers.
@@ -245,25 +250,30 @@ Once the user program calls `tx_batch` the driver performs two steps: cleanup an
 #### Ring layout
 
 ```
-+--------+ <- base address
-| empty  |
-+--------+
-| empty  |
-+--------+ <- base + clean_index
-| dirty  |
-+--------+
-| dirty  |
-+--------+ <- base + head
-| unsent |
-+--------+
-| unsent |
-+--------+
-| unsent |
-+--------+ <- base + tail
-| empty  |
-+--------+
-| empty  |
-+--------+
+ +-------+
+ |       |
+ |       v
+ |   +--------+ <- base address            |
+ |   |        |                            |
+w|   | empty  |                            |
+r|   |        |                            |
+a|   +--------+ <- base + clean_index      |
+p|   |        |                            |i
+ |   | dirty  |                            |n
+a|   |        |                            |c
+r|   +--------+ <- base + head             |r
+o|   |        |                            |e
+u|   |        |                            |m
+n|   | unsent |                            |e
+d|   |        |                            |n
+ |   |        |                            |t
+ |   +--------+ <- base + tail             |
+ |   |        |                            |
+ |   | empty  |                            |
+ |   |        |                            |
+ |   +--------+                            v
+ |       |
+ +-------+
 ```
 
 * Descriptors between `clean_index` and `head` are previously inserted packets that have been sent by the NIC.
@@ -276,12 +286,19 @@ Before inserting the outgoing packets into the descriptor ring, the driver needs
 To improve performance, cleanup has to be done in batches of 32 descriptors.
 
 For performance reasons we can't actually read the head pointer; reading NIC registers requires a full PCIe transaction.
-The buffers, that may be ready to be cleaned, are the ones between `clean_index` and the tail pointer.
-Of these the ones that have their DD bit set are ready to be cleaned.
-However, it is inefficient to check every descriptor's DD bit so we only check every 32nd descriptor.
-If this buffer's DD bit is set, all the buffer's before this one have also been sent out and can be cleaned.
+The buffers that may be ready to be cleaned are the ones between `clean_index` and the tail pointer; of these the ones that have their DD bit set are ready to be cleaned.
+However, it is inefficient to check every descriptor's DD bit.
+Therefore ixy checks the descriptor 32 ahead of `clean_index`; if this descriptor's DD bit is set, all the buffers that were skipped can also be cleaned.
+After cleaning these buffers, `clean_index` can be incremented by 32 and the whole process can be repeated until a buffer, whose DD bit isn't set, is hit.
+
+In addition to ixy's behavior, ixy.ml supports another cleanup strategy; this behavior can be switched on and off when calling `tx_batch`:
+Optionally ixy.ml checks the descriptor 128 ahead of `clean_index`.
+If this descriptor's DD bit is set, all 128 buffers can be cleaned at once and cleaning is done; remaining buffers will be cleaned upon the next call to `tx_batch`.
+If the DD bit is not set the same procedure will be repeated for offsets of 64 and 32.
+This favors large collections at once, thereby reducing the amount of memory reads and increasing the amount of descriptors cleaned in a single pass.
+If `tx_batch` is called with `~clean_large:true` the second strategy will be chosen; otherwise ixy's behavior will be replicated.
 
 #### Transmit
 
-To transmit packets, the driver just walks the descriptor ring until it has sent all packets or hits a non-cleaned descriptor, setting each descriptor to one of the packets that are to be transmitted.
+To transmit packets the driver just walks the descriptor ring, setting each descriptor to one of the packets that are to be transmitted, until it has sent all packets or hits a non-cleaned descriptor.
 Once that's done the tail pointer register needs to be updated; ixy then returns the number of sent packets to the caller while ixy.ml returns the unsent packets themselves.

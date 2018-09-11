@@ -1,8 +1,12 @@
 # OCaml Basics
 
 This serves as a simple introduction to OCaml.
+It was initially written during the summer of 2018; all code examples were tested in OCaml 4.07.0, though any somewhat recent version of OCaml should suffice.
+The target audience is beginner to intermediate programmers with experience in at least one language; no functional programming experience is required.
 
 ## Tools
+
+Tools that don't link to an external site are part of the standard OCaml distribution.
 
 * `ocaml` - OCaml interpreter (aka toplevel)
 * `ocamlc` - OCaml bytecode compiler
@@ -32,7 +36,9 @@ val y : int = 2
 
 ### Comments
 
-Comments are enclosed in `(*` and `*)`. There are no single line comments.
+Comments are enclosed in `(*` and `*)`.
+There are no single line comments.
+Comments starting with `(**` are documentation comments that will be picked up by documentation generators.
 
 ```ocaml
 (* this is a comment *)
@@ -91,6 +97,12 @@ let rec apply_n_times ~n ~f x =
 fun x -> x + 1 (* function that maps each integer to its successor *)
 ```
 
+### Boolean Operators
+
+* `not` is the negation operator
+* `&&` is the logical and operator
+* `||` is the logical or operator
+
 ### `if` statement
 
 `if` statements are actually expressions.
@@ -106,9 +118,9 @@ else
 
 ```ocaml
 let counter = ref 10 in
-while !counter > 0 do (* ! is the dereference operator, not the negation operator *)
+while !counter > 0 do (* '!' is the dereference operator, not the negation operator *)
   print_endline "still looping...";
-  counter := !counter - 1 (* could write decr counter instead *)
+  counter := !counter - 1 (* could write 'decr counter' instead *)
 done
 
 for i = 0 to 10 do (* both bounds are inclusive, i.e. i ∊ [0, 10] *)
@@ -338,7 +350,7 @@ type my_variant =
 let my_variant_list = [B 1; String "this is also a string"; A; A] : my_variant list
 ```
 
-#### Polymorphic Variant
+#### Polymorphic variant
 
 Polymorphic variants are variants that can be created without a type definition.
 
@@ -442,7 +454,7 @@ end = struct
 
   (* immediately deconstruct the argument *)
   let to_string { real; imaginary } =
-    if not Float.is_non_positive imaginary then
+    if not (Float.is_non_positive imaginary) then
       Printf.sprintf "%f + %fi" real imaginary
     else
       Printf.sprintf "%f - %fi" real (Float.neg imaginary)
@@ -471,7 +483,7 @@ let () =
     "a: %s\nb: %s\na + b: %s\na * b: %s\n"
     (Complex.to_string a)
     (Complex.to_string b)
-    Complex.(to_string (add a b)) (* "A.(<expr>)"" opens module "A" in <expr> *)
+    Complex.(to_string (add a b)) (* 'A.(<expr>)' opens module 'A' in <expr> *)
     Complex.(to_string (mul a b))
 ```
 
@@ -511,7 +523,7 @@ end
 Note the `private` keyword.
 This prevents other modules from creating values of type `Complex.t`, though now they can deconstruct them (i.e. access the members `real` and `imaginary`) since their internal implementation is exposed.
 
-## Objects
+## Objects and Classes
 
 In addition to an extremely powerful module system OCaml also offers a somewhat unusual object and class system.
 In fact, the "O" in "OCaml" stands for "Objective".
@@ -673,7 +685,7 @@ Any object can be used in place of any other object as long as it supports this 
 
 ### Indentation
 
-OCaml has no meaningful whitespace although [several](https://ocaml.org/learn/tutorials/guidelines.html#Indentation-of-programs) [style guides](https://opensource.janestreet.com/standards/#indentation) recommend indenting with two spaces.
+OCaml has no meaningful whitespace although several style guides ([1](https://ocaml.org/learn/tutorials/guidelines.html#Indentation-of-programs), [2](https://opensource.janestreet.com/standards/#indentation)) recommend indenting with two spaces.
 
 ### Type conversion
 
@@ -696,7 +708,7 @@ let f : float = Int.to_float i
 
 Just as any other language it is common practice to subdivide programs into small and easy-to-understand modules.
 
-Oftentimes modules obviate the need for objects (the "O" in OCaml stands for "Objective") given that object functionality can be sufficiently emulated using modules.
+Oftentimes modules obviate the need for objects given that object functionality can be sufficiently emulated using modules.
 
 Modules oftentimes define their own type (see the `Complex` module in the [**Modules**](#modules) section).
 This central type of the module is by convention called `t`, accessed by other modules as `Module_name.t`, and instantiated using a `create` function.
