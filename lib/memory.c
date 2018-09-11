@@ -74,7 +74,11 @@ static int map_flag_table[15] = {
     MAP_FIXED,
     MAP_ANONYMOUS,
 #ifdef __linux__
+#if __x86_64__
     MAP_32BIT,
+#else
+    0,
+#endif
     MAP_GROWSDOWN,
     MAP_HUGETLB,
     MAP_LOCKED,
