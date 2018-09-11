@@ -713,6 +713,29 @@ Oftentimes modules obviate the need for objects given that object functionality 
 Modules oftentimes define their own type (see the `Complex` module in the [**Modules**](#modules) section).
 This central type of the module is by convention called `t`, accessed by other modules as `Module_name.t`, and instantiated using a `create` function.
 
+### Function composition operators
+
+OCaml's standard library contains the two operators `|>` and `@@` that implement reverse function application and function application, respectively:
+
+```ocaml
+let ( |> ) x f = f x
+
+let ( @@ ) f x = f x
+```
+
+`|>` can be thought of as a pipeline operator (similar to the `|` operator commonly found in shell languages) that "pipes" the value on the left of the operator into the function on the right of the operator, e.g. `x |> f |> g` is equivalent to `g (f x)`.
+This operator lends itself to chains of function application where each function's output is "piped" into the next function:
+
+```ocaml
+List.range 0 100 (* create the list [0; ...; 99] *)
+|> List.filter ~f:(fun i -> i mod 2 = 0 || i >= 20) (* remove all odd values less than 20 *)
+|> List.map ~f:(fun i -> i + i) (* double all values *)
+|> List.fold ~init:0 ~f:( + ) (* sum the list *)
+```
+
+`@@` is simply a low-precedence operator that obviates the need for parentheses when applying a function to the result of another function application, e.g. `g @@ f x` is equivalent to `g (f x)`.
+This operator can improve readability of long chains of nested function applications.
+
 ## Resources
 
 ### OCaml manual
