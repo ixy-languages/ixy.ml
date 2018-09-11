@@ -168,9 +168,9 @@ let start_rx t i =
     error "number of rx queue entries must be a power of 2";
   (* reset all descriptors *)
   Array.iteri rxq.virtual_addresses ~f:(reset_rx_desc rxd);
-  let ring_size_bytes =
+  (*let ring_size_bytes =
     rx_descriptor_bytes * num_rx_queue_entries in
-  Memory.dump_memory "rxd-post-init" rxd ring_size_bytes;
+  Memory.dump_memory "rxd-post-init" rxd ring_size_bytes; *)
   t.set_flags (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
   t.wait_set (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
   t.set_reg (IXGBE.RDH i) 0;
@@ -318,8 +318,9 @@ let rx_batch t rxq_id =
   loop rxq.rx_index rxq.rx_index []
   |> List.rev
 
-let tx_batch t txq_id bufs =
+let tx_batch ?(clean_large = false) t txq_id bufs =
   let txq = t.txqs.(txq_id) in
+  (* returns wether or not the descriptor at clean_index + offset can be cleaned *)
   let check offset =
     if txq.clean_index + offset land (txq.num_entries - 1) >= txq.tx_index then
       false
@@ -343,12 +344,18 @@ let tx_batch t txq_id bufs =
       else
         txq.clean_index <- wrap_ring cleanup_to txq.num_entries in
     loop txq.clean_index in
-  if check 128 then
-    clean_until 128
-  else if check 64 then
-    clean_until 64
-  else if check 32 then
-    clean_until 32;
+  if clean_large then begin
+    if check 128 then (* possibly quicker batching *)
+      clean_until 128
+    else if check 64 then
+      clean_until 64
+    else if check 32 then
+      clean_until 32
+  end else begin
+    while check 32 do (* default ixy behavior *)
+      clean_until 32
+    done
+  end;
   let reset_tx_desc base n pkt_buf =
     let offset = n * rx_descriptor_bytes in
     Memory.write64 base offset (Memory.pkt_buf_get_phys pkt_buf);

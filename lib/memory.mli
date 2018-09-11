@@ -66,7 +66,7 @@ val write8 : virt -> int -> int -> unit
 
 val offset_ptr : virt -> int -> virt
 
-val make_ocaml_string : virt -> int -> string
+val make_ocaml_string : virt -> int -> Bytes.t
 
 val get_string : unit -> virt
 
@@ -80,11 +80,15 @@ type mempool
 
 val allocate_mempool : ?entry_size:int -> num_entries:int -> mempool
 
+val num_free_bufs : mempool -> int
+
 type pkt_buf
 
 val pkt_buf_resize : pkt_buf -> int -> unit
 
-val pkt_buf_get_data : pkt_buf -> bytes
+val pkt_buf_dump_raw : string -> pkt_buf -> unit
+
+val pkt_buf_get_data : pkt_buf -> Bytes.t
 
 val pkt_buf_get_phys : pkt_buf -> int64
 

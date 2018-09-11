@@ -1,6 +1,7 @@
 open Core
 open Log
 
+(* type of raw C pointers *)
 type virt
 
 type dma_memory = {
@@ -31,7 +32,7 @@ type map =
   | MAP_NOCACHE (* macOS only *)
   | MAP_HASSEMAPHORE (* macOS only *)
 
-external c_virt_to_phys : 'a -> int64 = "caml_virt_to_phys" (* for testing purposes *)
+external c_virt_to_phys : 'a -> int64 = "caml_virt_to_phys" (* TODO delete this after testing *)
 external int64_of_addr : 'a -> int64 = "caml_int64_of_addr"
 external offset_ptr : virt -> int -> virt = "caml_offset_ptr"
 external mlock : virt -> int -> unit = "caml_mlock"
@@ -51,19 +52,18 @@ external read8 : virt -> int -> int = "caml_read8"
 external write8 : virt -> int -> int -> unit = "caml_write8"
 external getnullptr : unit -> virt = "caml_getnullptr"
 
-external make_ocaml_string : virt -> int -> string = "caml_make_ocaml_string"
-external get_string : unit -> virt = "caml_get_string"
+external make_ocaml_string : virt -> int -> Bytes.t = "caml_make_ocaml_string"
+external get_string : unit -> virt = "caml_get_string" (* TODO delete this after testing *)
 external c_dump_memory : string -> virt -> int -> unit = "caml_dump_memory"
 external malloc : int -> virt = "caml_malloc"
 
 let dump_memory file virt len =
-  debug "dumping %#x bytes at virt %#018Lx" len (int64_of_addr virt);
+  debug "dumping %d bytes at virt %#018Lx" len (int64_of_addr virt);
   let oc = Out_channel.create (file ^ ".bin") in
   for i = 0 to len - 1 do
     Out_channel.output_byte oc (read8 virt i)
   done;
-  Out_channel.close oc;
-  c_dump_memory (file ^ "-c.bin") virt len
+  Out_channel.close oc
 
 let nullptr = getnullptr ()
 
@@ -135,12 +135,14 @@ type mempool = {
 and pkt_buf = {
   phys : int64;
   mempool : mempool;
-  data : bytes (* this points to the beginning of the packet data in the huge page *)
+  data_base : virt;
+  data : Bytes.t (* this points to the beginning of the packet data in the huge page *)
 }
 
-external pkt_buf_resize : pkt_buf -> int -> unit = "caml_make_ocaml_string"
-
-let max_pkt_size = 1983 (* TODO check this number *)
+let pkt_buf_resize pkt_buf len =
+  let data_start =
+    offset_ptr pkt_buf.data_base 64 in
+  ignore @@ make_ocaml_string data_start len
 
 let allocate_mempool ?(entry_size = 2048) ~num_entries =
   if huge_page_size mod entry_size <> 0 then
@@ -162,12 +164,20 @@ let allocate_mempool ?(entry_size = 2048) ~num_entries =
             offset_ptr mem.virt ((i * entry_size) + 64) in
           { phys = virt_to_phys data_address;
             mempool;
-            data = (Obj.magic make_ocaml_string data_address (entry_size - 64) : bytes) (* TODO fix this crappy cast *)
+            data_base = offset_ptr mem.virt (i * entry_size);
+            data = make_ocaml_string data_address (entry_size - 64 - 1) (* TODO fix this crappy cast *)
           }) in
   (* kind of ugly to immediately redefine free_bufs here
    * OTOH it's mutable anyway *)
   mempool.free_bufs <- free_bufs;
   mempool
+
+let num_free_bufs mempool =
+  mempool.num_free_bufs
+
+let pkt_buf_dump_raw file pkt_buf =
+  let size = pkt_buf.mempool.buf_size in
+  dump_memory file pkt_buf.data_base size
 
 let pkt_buf_get_data { data; _ } = data
 
@@ -201,6 +211,6 @@ let pkt_buf_alloc mempool =
 
 let pkt_buf_free buf =
   let mempool = buf.mempool in
-  pkt_buf_resize buf max_pkt_size;
+  pkt_buf_resize buf (mempool.buf_size - 64 - 1); (* 64 bytes for alignment, 1 byte for padding *)
   mempool.free_bufs <- buf :: mempool.free_bufs;
   mempool.num_free_bufs <- mempool.num_free_bufs + 1

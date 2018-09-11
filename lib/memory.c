@@ -16,6 +16,7 @@
 #include <caml/signals.h>
 #include <caml/gc.h>
 
+// TODO delete this after testing
 static uintptr_t virt_to_phys(void* virt) {
     long pagesize = sysconf(_SC_PAGESIZE);
     int fd = open("/proc/self/pagemap", O_RDONLY);
