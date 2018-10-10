@@ -1,0 +1,15 @@
+(jbuild_version 1)
+
+(executable
+ ((name echo)
+  (public_name echo)
+  (modes (native))
+  (libraries (ixy))
+  (modules (echo))))
+
+(executable
+ ((name fwd)
+  (public_name fwd)
+  (modes (native))
+  (libraries (ixy))
+  (modules (fwd))))
