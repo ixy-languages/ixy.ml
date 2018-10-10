@@ -32,7 +32,6 @@ type map =
   | MAP_NOCACHE (* macOS only *)
   | MAP_HASSEMAPHORE (* macOS only *)
 
-external c_virt_to_phys : 'a -> int64 = "caml_virt_to_phys" (* TODO delete this after testing *)
 external int64_of_addr : 'a -> int64 = "caml_int64_of_addr"
 external offset_ptr : virt -> int -> virt = "caml_offset_ptr"
 external mlock : virt -> int -> unit = "caml_mlock"
@@ -138,6 +137,8 @@ and pkt_buf = {
   data_base : virt;
   data : Bytes.t (* this points to the beginning of the packet data in the huge page *)
 }
+
+external init_rxd : virt -> pkt_buf array -> unit = "caml_init_rxd"
 
 let pkt_buf_resize pkt_buf len =
   let data_start =

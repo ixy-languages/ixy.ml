@@ -42,8 +42,6 @@ val munlock : virt -> int -> unit
 
 val virt_to_phys : virt -> int64
 
-val c_virt_to_phys : virt -> int64 (* should return the same as virt_to_phys *)
-
 val allocate_dma : ?require_contiguous:bool -> int -> dma_memory
 
 val test_string : string -> unit
@@ -97,3 +95,5 @@ val pkt_buf_alloc_batch : mempool -> num_bufs:int -> pkt_buf array
 val pkt_buf_alloc : mempool -> pkt_buf option
 
 val pkt_buf_free : pkt_buf -> unit
+
+val init_rxd : virt -> pkt_buf array -> unit

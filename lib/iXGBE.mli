@@ -1,9 +1,5 @@
 val max_queues : int (* maximum number of queues *)
 
-val vendor_intel : int
-
-val device_82599 : int
-
 module ADV_RXD : sig
   val stat_dd : int (* descriptor done *)
 
@@ -219,14 +215,14 @@ type _ register =
   | TXDCTL : int -> TXDCTL.t register (* transmit descriptor control *)
   | DMATXCTL : DMATXCTL.t register (* DMA tx control *)
 
-val get_reg : Pci.hw -> 'a register -> int
+val get_reg : PCI.hw -> 'a register -> int
 
-val set_reg : Pci.hw -> 'a register -> 'a -> unit
+val set_reg : PCI.hw -> 'a register -> 'a -> unit
 
-val set_flags : Pci.hw -> 'a register -> 'a -> unit
+val set_flags : PCI.hw -> 'a register -> 'a -> unit
 
-val clear_flags : Pci.hw -> 'a register -> 'a -> unit
+val clear_flags : PCI.hw -> 'a register -> 'a -> unit
 
-val wait_set : Pci.hw -> 'a register -> 'a -> unit
+val wait_set : PCI.hw -> 'a register -> 'a -> unit
 
-val wait_clear : Pci.hw -> 'a register -> 'a -> unit
+val wait_clear : PCI.hw -> 'a register -> 'a -> unit

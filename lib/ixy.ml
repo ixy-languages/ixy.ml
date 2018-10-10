@@ -8,6 +8,8 @@ module Uname = Uname
 
 module Log = Log
 
+module PCI = PCI
+
 let max_rx_queue_entries = 4096
 let max_tx_queue_entries = 4096
 
@@ -21,7 +23,7 @@ let tx_descriptor_bytes = 16
 
 type rxq = {
   descriptors : Memory.virt;
-  mutable mempool : Memory.mempool;
+  mempool : Memory.mempool;
   num_entries : int;
   mutable rx_index : int; (* descriptor ring tail pointer  *)
   virtual_addresses : Memory.pkt_buf array;
@@ -32,14 +34,14 @@ type txq = {
   num_entries : int;
   mutable clean_index : int; (* first unclean descriptor *)
   mutable tx_index : int; (* descriptor ring tail pointer *)
-  virtual_addresses : Memory.pkt_buf option array;
+  virtual_addresses : Memory.pkt_buf option array; (* TODO might be unboxed *)
 }
 
 type t = {
-  hw : Pci.hw;
+  hw : PCI.hw;
   pci_addr : string;
   num_rxq : int;
-  mutable rxqs : rxq array;
+  mutable rxqs : rxq array; (* TODO mutability needed? *)
   num_txq : int;
   mutable txqs : txq array;
   get_reg : int IXGBE.register -> int;
@@ -168,9 +170,6 @@ let start_rx t i =
     error "number of rx queue entries must be a power of 2";
   (* reset all descriptors *)
   Array.iteri rxq.virtual_addresses ~f:(reset_rx_desc rxd);
-  (*let ring_size_bytes =
-    rx_descriptor_bytes * num_rx_queue_entries in
-  Memory.dump_memory "rxd-post-init" rxd ring_size_bytes; *)
   t.set_flags (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
   t.wait_set (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
   t.set_reg (IXGBE.RDH i) 0;
@@ -239,19 +238,22 @@ let create ~pci_addr ~rxq ~txq =
     error "cannot configure %d rx queues (max: %d)" rxq IXGBE.max_queues;
   if txq > IXGBE.max_queues then
     error "cannot configure %d tx queues (max: %d)" txq IXGBE.max_queues;
-  let Pci.{ vendor; device_id; device_class } = Pci.get_config pci_addr in
-  if device_class <> 2 then
-    warn "device %s is not a NIC (device_class: %d)" pci_addr device_class;
-  if vendor <> IXGBE.vendor_intel then
-    warn "device %s is not an Intel 82599 (vendor_id: %d)" pci_addr vendor;
-  if device_id <> IXGBE.device_82599 then
-    warn
-      "device %s has unexpected id %d; may have been set in EEPROM (expected: %d)"
-      pci_addr
-      device_id
-      IXGBE.device_82599;
+  let PCI.{ vendor; device_id; class_code; subclass; prog_if } =
+    PCI.get_config pci_addr in
+  begin match class_code, subclass, prog_if, vendor with
+  | 0x2, 0x0, 0x0, v when v = PCI.vendor_intel -> ()
+  | 0x1, 0x0, 0x0, v when v = PCI.vendor_intel -> (* TODO make these errors *)
+    warn "device %s is configured as SCSI storage device in EEPROM" pci_addr
+  | 0x2, 0x0, _, v when v <> PCI.vendor_intel ->
+    warn "device %s is a non-Intel NIC (vendor: %#x)" pci_addr vendor
+  | 0x2, _, _, _ ->
+    warn "device %s is not an Ethernet NIC (subclass: %#x)" pci_addr subclass
+  | _ ->
+    warn "device %s is not a NIC (class: %#x)" pci_addr class_code
+  end;
+  info "device %s has device id %#x" pci_addr device_id;
   let hw =
-    Pci.map_resource pci_addr in
+    PCI.map_resource pci_addr in
   let t =
     { hw;
       pci_addr;
@@ -284,7 +286,7 @@ let create ~pci_addr ~rxq ~txq =
   done;
   t
 
-let wrap_ring index size = (index + 1) land (size - 1)
+let wrap_ring index size = (index + 1) land (size - 1) [@@inline always]
 
 let rx_batch t rxq_id =
   let rxq = t.rxqs.(rxq_id) in
@@ -307,6 +309,7 @@ let rx_batch t rxq_id =
         | Some buf -> buf in
       rxq.virtual_addresses.(rx_index) <- new_buf;
       reset_rx_desc desc_ptr rx_index new_buf;
+      debug "received packet on device %s queue %d" t.pci_addr rxq_id;
       loop (wrap_ring rx_index rxq.num_entries) rx_index (buf :: acc)
     end else begin
       if rx_index <> last_rx_index then begin
@@ -352,8 +355,8 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
     else if check 32 then
       clean_until 32
   end else begin
-    while check 32 do (* default ixy behavior *)
-      clean_until 32
+    while check tx_clean_batch do (* default ixy behavior *)
+      clean_until tx_clean_batch
     done
   end;
   let reset_tx_desc base n pkt_buf =

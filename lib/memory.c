@@ -16,29 +16,6 @@
 #include <caml/signals.h>
 #include <caml/gc.h>
 
-// TODO delete this after testing
-static uintptr_t virt_to_phys(void* virt) {
-    long pagesize = sysconf(_SC_PAGESIZE);
-    int fd = open("/proc/self/pagemap", O_RDONLY);
-    // pagemap is an array of pointers for each normal-sized page
-    lseek(fd, (uintptr_t) virt / pagesize * sizeof(uintptr_t), SEEK_SET);
-    uintptr_t phy = 0;
-    read(fd, &phy, sizeof(phy));
-    close(fd);
-    if (!phy) {
-        fprintf(stderr, "failed to translate virtual address %p to physical address", virt);
-        exit(1);
-    }
-    // bits 0-54 are the page number
-    return (phy & 0x7fffffffffffffULL) * pagesize + ((uintptr_t) virt) % pagesize;
-}
-
-CAMLprim value caml_virt_to_phys(value virt) {
-    CAMLparam1(virt);
-    uintptr_t phys = virt_to_phys((void *) virt);
-    CAMLreturn(caml_copy_int64(phys));
-}
-
 CAMLprim value caml_int64_of_addr(value virt) {
     CAMLparam1(virt);
     CAMLreturn(caml_copy_int64((uint64_t) virt));
@@ -254,3 +231,80 @@ CAMLprim value caml_malloc(value len) {
         caml_failwith("couldn't malloc");
     CAMLreturn((value) mem);
 }
+
+typedef uint8_t u8;
+typedef int8_t s8;
+typedef uint16_t u16;
+typedef int16_t s16;
+typedef uint32_t u32;
+typedef int32_t s32;
+typedef uint64_t u64;
+typedef int64_t s64;
+
+/* Little Endian defines */
+#ifndef __le16
+#define __le16  u16
+#endif
+#ifndef __le32
+#define __le32  u32
+#endif
+#ifndef __le64
+#define __le64  u64
+
+#endif
+
+union ixgbe_adv_rx_desc {
+    struct {
+        __le64 pkt_addr; /* Packet buffer address */
+        __le64 hdr_addr; /* Header buffer address */
+    } read;
+    struct {
+        struct {
+            union {
+                __le32 data;
+                struct {
+                    __le16 pkt_info; /* RSS, Pkt type */
+                    __le16 hdr_info; /* Splithdr, hdrlen */
+                } hs_rss;
+            } lo_dword;
+            union {
+                __le32 rss; /* RSS Hash */
+                struct {
+                    __le16 ip_id; /* IP id */
+                    __le16 csum; /* Packet Checksum */
+                } csum_ip;
+            } hi_dword;
+        } lower;
+        struct {
+            __le32 status_error; /* ext status/error */
+            __le16 length; /* Packet length */
+            __le16 vlan; /* VLAN tag */
+        } upper;
+    } wb;  /* writeback */
+};
+
+CAMLprim value caml_init_rxd(value rxd_val, value bufs) {
+    CAMLparam2(rxd_val, bufs);
+    volatile union ixgbe_adv_rx_desc *rxd = (volatile union ixgbe_adv_rx_desc *) rxd_val;
+    for (int i = 0; i < caml_array_length(bufs); i++) {
+        value buf = Field(bufs, i);
+        uintptr_t phys = Int64_val(Field(buf, 0));
+        rxd[i].read.pkt_addr = phys;
+        rxd[i].read.hdr_addr = 0;
+    }
+    CAMLreturn(Val_unit);
+}
+
+/* Transmit Descriptor - Advanced */
+union ixgbe_adv_tx_desc {
+    struct {
+        __le64 buffer_addr; /* Address of descriptor's data buf */
+        __le32 cmd_type_len;
+        __le32 olinfo_status;
+    } read;
+    struct {
+        __le64 rsvd; /* Reserved */
+        __le32 nxtseq_seed;
+        __le32 status;
+    } wb;
+};

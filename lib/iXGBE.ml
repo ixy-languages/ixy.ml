@@ -2,10 +2,6 @@ open Core
 
 let max_queues = 64
 
-let vendor_intel = 0x8086
-
-let device_82599 = 0x10D8
-
 module ADV_RXD = struct
   let stat_dd = 0x01
 
@@ -363,7 +359,7 @@ let wait_set (type t) hw (reg : t register) (mask : t) =
     ()
   else
     while get_reg hw reg land mask <> mask do
-      Caml.Unix.sleepf 0.01; (* Core dropped sleepf for some reason *)
+      ignore @@ Unix.nanosleep 0.01;
       Log.debug
         "waiting for flags %#08X in reg %s(%#05Xr)"
         mask
@@ -378,7 +374,7 @@ let wait_clear (type t) hw (reg : t register) (mask : t) =
     ()
   else
     while get_reg hw reg land mask <> 0 do
-      Caml.Unix.sleepf 0.01; (* Core dropped sleepf for some reason *)
+      ignore @@ Unix.nanosleep 0.01;
       Log.debug
         "waiting for flags %#08X in reg %s(%#05Xr)"
         mask
