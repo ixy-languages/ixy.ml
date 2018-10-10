@@ -163,7 +163,7 @@ Therefore ixy.ml buffers look like this:
                      |
                     buf
 ```
-Since there is always at least one padding byte the maximum packet data length for ixy.ml is 1983 bytes.
+Since there is always at least one padding byte, the maximum packet data length for ixy.ml is 1983 bytes.
 
 ## Receive Descriptors (rx descriptors)
 
