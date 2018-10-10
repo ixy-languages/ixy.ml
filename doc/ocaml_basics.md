@@ -4,6 +4,8 @@ This serves as a simple introduction to OCaml.
 It was initially written during the summer of 2018; all code examples were tested in OCaml 4.07.0, though any somewhat recent version of OCaml should suffice.
 The target audience is beginner to intermediate programmers with experience in at least one language; no functional programming experience is required.
 
+Type annotations are rarely necessary and, unless specified otherwise, are just for readability.
+
 ## Tools
 
 Tools that don't link to an external site are part of the standard OCaml distribution.
@@ -176,6 +178,22 @@ let rec len list = (* rec indicates that this function is recursive *)
   | hd :: tl -> 1 + len tl
 ```
 `len` has type `'a list -> int`.
+
+### Tail recursion
+
+Tail recursion can be used to prevent stack overflows due to looping recursion.
+When all recursive calls of a functions are "last calls" (i.e. there are no calculations done after the recursive call returns) the current calls stack frame can be reused for the recursive call.
+
+The `len` function from the previous section can be optimized like so:
+
+```ocaml
+let len list =
+  let rec aux acc l =
+    match l with
+    | [] -> acc
+    | _ :: tl -> aux (acc + 1) tl in
+  aux 0 list
+```
 
 ### Main function
 
@@ -642,10 +660,10 @@ let () =
 
 Let's demonstrate inheritance by creating a parameterized container class and then specializing it for our `int_container`:
 ```ocaml
-(* the class container is parameterized over the polymorphic type 'a *)
+(* the class 'container' is parameterized over the polymorphic type 'a *)
 class ['a] container init =
   object
-    (* explicit type annotation is necessary here, otherwise content could have some other type 'b *)
+    (* explicit type annotation is necessary here, otherwise 'content' could have some other type 'b *)
     val mutable content : 'a = init
 
     method get_content = content
@@ -674,12 +692,75 @@ class string_container init =
 
 Classes that cannot be instantiated into objects and only exist to be inherited are usually called "abstract", in OCaml they are called `virtual`.
 
-Classes can be entirely `virtual` or have `virtual` methods. (TODO check this)
+If we don't want instantiations of the `['a] container` class, we can make it `virtual`:
+
+```ocaml
+class virtual ['a] container init =
+  object
+    val mutable content : 'a = init
+
+    method get_content = content
+
+    method set_content new_content = content <- new_content
+  end
+```
+
+`new container` will now fail:
+
+```
+Error: Cannot instantiate the virtual class container
+```
+
+### Virtual methods
+
+`virtual` classes can have both actual implemented methods as well as `virtual` methods.
+`virtual` methods must be implemented by classes that inherit them, unless they themselves are `virtual`.
+
+In the following example our `container` class requires subclasses to define a methods for serialization:
+
+```ocaml
+class virtual ['a] container init =
+  object (self)
+    val mutable content : 'a = init
+
+    method get_content = content
+
+    method set_content new_content = content <- new_content
+
+    method virtual serialize : string
+  end
+
+class int_container init =
+  object (self)
+    inherit [int] container init
+
+    method twice =
+      self#set_content (2 * self#get_content)
+
+    method serialize =
+      Int.to_string self#get_content
+  end
+
+class string_container init =
+  object (self)
+    inherit [string] container init
+
+    method length =
+      String.length self#get_content
+
+    method serialize =
+      self#get_content
+  end
+```
+
+### Private methods
+
+Methods marked with the `private` keyword can only be called by subclasses.
 
 ### Structural typing
 
-Unlike all other values in OCaml, objects are structurally typed.
-Any object can be used in place of any other object as long as it supports this object's methods. (TODO check this)
+Unlike all other values in OCaml (except modules and polymorphic variants), objects are structurally typed.
+Roughly speaking, any object can be used in place of any other object as long as it supports this object's methods.
 
 ## Common practices
 
@@ -694,11 +775,13 @@ OCaml never implicitly casts one type to another. All conversion has to be done 
 ```ocaml
 let i : int = 1
 let f : float = float_of_int i (* a_of_b instead of b_to_a *)
+```
 
-open Core (* use alternative stdlib *)
+Using Core:
 
-(* creates new variables instead of changing the old ones (immutability by default)
-   this practice is also called "shadowing" *)
+```ocaml
+open Core
+
 let i : int = 1
 let f : float = Float.of_int i
 let f : float = Int.to_float i
@@ -735,6 +818,22 @@ List.range 0 100 (* create the list [0; ...; 99] *)
 
 `@@` is simply a low-precedence operator that obviates the need for parentheses when applying a function to the result of another function application, e.g. `g @@ f x` is equivalent to `g (f x)`.
 This operator can improve readability of long chains of nested function applications.
+
+### ppx
+
+OCaml supports syntax extensions via ppx preprocessors.
+Source code can be annotated at certain spots.
+These annotations are preserved in the first abstract syntax tree (AST) which in turn can be scanned and modified by ppx preprocessors.
+
+OCaml includes a few syntax extensions, for example to control inlining behavior:
+
+```ocaml
+let f x = x + x [@@inline always] (* inline 'f' regardless of cost/benefit *)
+
+let rec len = function
+  | [] -> 0
+  | _ :: tl -> 1 + len tl [@@unroll 10] (* unroll the loop 10 times *)
+```
 
 ## Resources
 
