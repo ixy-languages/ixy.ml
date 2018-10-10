@@ -1,16 +1,20 @@
-all: memory check_nic mmap uname
+JBUILDER=jbuilder build
+JBUILDERFLAGS=-j 4
 
-memory:
-	jbuilder build test/memory.exe -j 4
+TEST=memory check_nic mmap uname pci_config
+APPS=echo fwd
 
-check_nic:
-	jbuilder build test/check_nic.exe -j 4
+all: ${TEST} ${APPS}
 
-mmap:
-	jbuilder build test/mmap.exe -j 4
+apps: ${APPS}
 
-uname:
-	jbuilder build test/uname.exe -j 4
+test: ${TEST}
+
+${TEST}:
+	${JBUILDER} test/$@.exe ${JBUILDERFLAGS}
+
+${APPS}:
+	${JBUILDER} app/$@.exe ${JBUILDERFLAGS}
 
 clean:
 	jbuilder clean
