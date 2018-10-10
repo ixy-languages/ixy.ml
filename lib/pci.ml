@@ -49,31 +49,40 @@ let map_resource pci_addr =
 type pci_config = {
   vendor : int;
   device_id : int;
-  device_class : int
+  class_code : int;
+  subclass : int;
+  prog_if : int
 }
+
+[%%cstruct
+  type pci_conf_space = {
+    vendor_id : uint16_t;
+    device_id : uint16_t;
+    command : uint16_t;
+    status : uint16_t;
+    revision_id : uint8_t;
+    prog_if : uint8_t;
+    subclass : uint8_t;
+    class_code : uint8_t
+  } [@@little_endian] (* PCI configuration space is always little endian *)
+]
 
 let get_config pci_addr =
   if Ixy_dbg.testing then
-    { vendor = 0; device_id = 0; device_class = 0 }
+    { vendor = 0; device_id = 0; class_code = 0; subclass = 0; prog_if = 0 }
   else begin
     let path =
       sprintf "/sys/bus/pci/devices/%s/config" pci_addr in
-    try
-      let fd = Unix.(openfile path ~mode:[O_RDWR]) in
-      let stat = Unix.fstat fd in
-      let size = Int.of_int64_exn stat.st_size in
-      let conf_space = Memory.(mmap size [PROT_READ; PROT_WRITE] [MAP_SHARED] fd 0) in
-      Unix.close fd;
-      let config =
-        { vendor = Memory.read16 conf_space 0;
-          device_id = Memory.read16 conf_space 2;
-          device_class = (Memory.read32 conf_space 8) lsr 24
-        } in
-      Memory.munmap conf_space size;
-      config
-    with Unix.Unix_error (e, f, _) ->
-      Log.error
-        "couldn't open PCIe configuration space: %s %s"
-        (Unix.Error.message e)
-        f
+    let data = In_channel.read_all path in
+    let cstruct = Cstruct.of_string data in
+    let pci_config =
+      { vendor = get_pci_conf_space_vendor_id cstruct;
+        device_id = get_pci_conf_space_device_id cstruct;
+        class_code = get_pci_conf_space_class_code cstruct;
+        subclass = get_pci_conf_space_subclass cstruct;
+        prog_if = get_pci_conf_space_prog_if cstruct
+      } in
+    pci_config
   end
+
+let vendor_intel = 0x8086

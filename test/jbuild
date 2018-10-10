@@ -27,3 +27,10 @@
   (modes (native))
   (libraries (ixy))
   (modules (uname))))
+
+(executable
+ ((name pci_config)
+  (public_name pci_config)
+  (modes (native))
+  (libraries (ixy))
+  (modules (pci_config))))
