@@ -11,6 +11,9 @@ build: [
 ]
 depends: [
   "core"
+  "cstruct-unix"
+  "ppx_cstruct"
+  "ppx_deriving"
   "jbuilder" {build & >= "1.0+beta20"}
 ]
 available: [ocaml-version >= "4.06.0"]

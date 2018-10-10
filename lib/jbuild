@@ -3,6 +3,6 @@
 (library 
  ((name ixy)
   (public_name ixy)
-  (libraries (core))
-  (preprocess (pps (ppx_deriving.enum)))
+  (libraries (core cstruct-unix))
+  (preprocess (pps (ppx_deriving.enum ppx_cstruct)))
   (c_names (uname memory))))
