@@ -14,6 +14,8 @@ let forward rx_dev tx_dev =
   loop rx
 
 let () =
+  if Array.length Sys.argv <> 3 then
+    Ixy.Log.error "Usage: %s <pci_addr> <pci_addr>" Sys.argv.(0);
   let dev_a = Ixy.create ~pci_addr:Sys.argv.(1) ~rxq:1 ~txq:1 in
   let dev_b = Ixy.create ~pci_addr:Sys.argv.(2) ~rxq:1 ~txq:1 in
   while true do
