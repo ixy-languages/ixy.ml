@@ -91,71 +91,73 @@ let init_link t =
 let init_rx t =
   (* disable RX while configuring *)
   t.clear_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen;
-  (* 128KB packet buffers *)
-  t.set_reg (IXGBE.RXPBSIZE 0) IXGBE.RXPBSIZE._128KB;
-  for i = 1 to 7 do
-    t.set_reg (IXGBE.RXPBSIZE i) 0
-  done;
-  (* enable CRC offload *)
-  t.set_flags IXGBE.HLREG0 IXGBE.HLREG0.rxcrcstrp;
-  t.set_flags IXGBE.RDRXCTL IXGBE.RDRXCTL.crcstrip;
-  (* accept broadcast *)
-  t.set_flags IXGBE.FCTRL IXGBE.FCTRL.bam;
-  (* descriptor is 16 bytes in size *)
-  let rxqs =
-    Array.init
-      t.num_rxq
-      ~f:(fun i -> 
-          debug "initializing rxq %d" i;
-          (* enable advanced descriptors *)
-          let srrctl = t.get_reg (IXGBE.SRRCTL i) in
-          t.set_reg
-            (IXGBE.SRRCTL i)
-            ((srrctl land (lnot IXGBE.SRRCTL.desctype_mask)) lor IXGBE.SRRCTL.desctype_adv_onebuf);
-          (* drop packets if no rx descriptors available *)
-          t.set_flags (IXGBE.SRRCTL i) IXGBE.SRRCTL.drop_en;
-          (* setup descriptor ring *)
-          let ring_size_bytes =
-            rx_descriptor_bytes * num_rx_queue_entries in
-          let descriptor_ring =
-            Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
-          (* set all descriptor bytes to 0xFF to prevent memory problems *)
-          for j = 0 to ring_size_bytes - 1 do
-            Memory.write8 descriptor_ring.virt j 0xFF
-          done;
-          (* set base address *)
-          t.set_reg (IXGBE.RDBAL i) Int64.(to_int_exn @@ descriptor_ring.phys land 0xFFFFFFFFL);
-          t.set_reg (IXGBE.RDBAH i) Int64.(to_int_exn @@ descriptor_ring.phys lsr 32);
-          (* set ring length *)
-          t.set_reg (IXGBE.RDLEN i) ring_size_bytes;
-          debug "rx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
-          (* ring head = ring tail = 0
-           * -> ring is empty
-           * -> NIC won't write packets until we start the queue *)
-          t.set_reg (IXGBE.RDH i) 0;
-          t.set_reg (IXGBE.RDT i) 0;
-          let mempool_size = num_rx_queue_entries + num_tx_queue_entries in
-          let mempool =
-            Memory.allocate_mempool
-              ~entry_size:2048
-              ~num_entries:(Int.max mempool_size 4096) in
-          let virtual_addresses =
-            Memory.pkt_buf_alloc_batch mempool ~num_bufs:num_rx_queue_entries in
-          { descriptors = descriptor_ring.virt;
-            mempool;
-            num_entries = num_rx_queue_entries;
-            rx_index = 0;
-            virtual_addresses
-          }
-        ) in
-  (* disable no snoop *)
-  t.set_flags IXGBE.CTRL_EXT IXGBE.CTRL_EXT.ns_dis;
-  (* set magic bits *)
-  for i = 0 to t.num_rxq - 1 do
-    t.clear_flags (IXGBE.DCA_RXCTRL i) (1 lsl 12)
-  done;
-  t.set_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen; (* warum hier? *)
-  t.rxqs <- rxqs
+  if t.num_rxq > 0 then begin
+    (* 128KB packet buffers *)
+    t.set_reg (IXGBE.RXPBSIZE 0) IXGBE.RXPBSIZE._128KB;
+    for i = 1 to 7 do
+      t.set_reg (IXGBE.RXPBSIZE i) 0
+    done;
+    (* enable CRC offload *)
+    t.set_flags IXGBE.HLREG0 IXGBE.HLREG0.rxcrcstrp;
+    t.set_flags IXGBE.RDRXCTL IXGBE.RDRXCTL.crcstrip;
+    (* accept broadcast *)
+    t.set_flags IXGBE.FCTRL IXGBE.FCTRL.bam;
+    (* descriptor is 16 bytes in size *)
+    let rxqs =
+      Array.init
+        t.num_rxq
+        ~f:(fun i -> 
+            debug "initializing rxq %d" i;
+            (* enable advanced descriptors *)
+            let srrctl = t.get_reg (IXGBE.SRRCTL i) in
+            t.set_reg
+              (IXGBE.SRRCTL i)
+              ((srrctl land (lnot IXGBE.SRRCTL.desctype_mask)) lor IXGBE.SRRCTL.desctype_adv_onebuf);
+            (* drop packets if no rx descriptors available *)
+            t.set_flags (IXGBE.SRRCTL i) IXGBE.SRRCTL.drop_en;
+            (* setup descriptor ring *)
+            let ring_size_bytes =
+              rx_descriptor_bytes * num_rx_queue_entries in
+            let descriptor_ring =
+              Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
+            (* set all descriptor bytes to 0xFF to prevent memory problems *)
+            for j = 0 to ring_size_bytes - 1 do
+              Memory.write8 descriptor_ring.virt j 0xFF
+            done;
+            (* set base address *)
+            t.set_reg (IXGBE.RDBAL i) Int64.(to_int_exn @@ descriptor_ring.phys land 0xFFFFFFFFL);
+            t.set_reg (IXGBE.RDBAH i) Int64.(to_int_exn @@ descriptor_ring.phys lsr 32);
+            (* set ring length *)
+            t.set_reg (IXGBE.RDLEN i) ring_size_bytes;
+            debug "rx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
+            (* ring head = ring tail = 0
+             * -> ring is empty
+             * -> NIC won't write packets until we start the queue *)
+            t.set_reg (IXGBE.RDH i) 0;
+            t.set_reg (IXGBE.RDT i) 0;
+            let mempool_size = num_rx_queue_entries + num_tx_queue_entries in
+            let mempool =
+              Memory.allocate_mempool
+                ~entry_size:2048
+                ~num_entries:(Int.max mempool_size 4096) in
+            let virtual_addresses =
+              Memory.pkt_buf_alloc_batch mempool ~num_bufs:num_rx_queue_entries in
+            { descriptors = descriptor_ring.virt;
+              mempool;
+              num_entries = num_rx_queue_entries;
+              rx_index = 0;
+              virtual_addresses
+            }
+          ) in
+    (* disable no snoop *)
+    t.set_flags IXGBE.CTRL_EXT IXGBE.CTRL_EXT.ns_dis;
+    (* set magic bits *)
+    for i = 0 to t.num_rxq - 1 do
+      t.clear_flags (IXGBE.DCA_RXCTRL i) (1 lsl 12)
+    done;
+    t.set_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen; (* warum hier? *)
+    t.rxqs <- rxqs
+  end
 
 let reset_rx_desc base n pkt_buf =
   let offset = n * rx_descriptor_bytes in
@@ -176,49 +178,51 @@ let start_rx t i =
   t.set_reg (IXGBE.RDT i) (rxq.num_entries - 1)
 
 let init_tx t =
-  (* enable crc offload and small packet padding *)
-  t.set_flags IXGBE.HLREG0 (IXGBE.HLREG0.txcrcen lor IXGBE.HLREG0.txpaden);
-  t.set_reg (IXGBE.TXPBSIZE 0) IXGBE.TXPBSIZE._40KB;
-  for i = 1 to 7 do
-    t.set_reg (IXGBE.TXPBSIZE i) 0
-  done;
-  t.set_reg IXGBE.DTXMXSZRQ 0xFFFF;
-  t.clear_flags IXGBE.RTTDCS IXGBE.RTTDCS.arbdis;
-  let txqs =
-    Array.init
-      t.num_txq
-      ~f:(fun i ->
-          debug "initializing txq %d" i;
-          let ring_size_bytes =
-            num_tx_queue_entries * tx_descriptor_bytes in
-          let descriptor_ring =
-            Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
-          for j = 0 to ring_size_bytes - 1 do
-            Memory.write8 descriptor_ring.virt j 0xFF
-          done;
-          (* set base address *)
-          t.set_reg (IXGBE.TDBAL i) Int64.(to_int_exn @@ descriptor_ring.phys land 0xFFFFFFFFL);
-          t.set_reg (IXGBE.TDBAH i) Int64.(to_int_exn @@ descriptor_ring.phys lsr 32);
-          (* set ring length *)
-          t.set_reg (IXGBE.TDLEN i) ring_size_bytes;
-          debug "tx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
-          let txdctl =
-            t.get_reg (IXGBE.TXDCTL i) in
-          let txdctl =
-            txdctl land ((lnot 0x3F) lor (0x3F lsl 8) lor (0x3F lsl 16)) in
-          let txdctl =
-            txdctl lor (36 lor (8 lsl 8) lor (4 lsl 16)) in
-          t.set_reg (IXGBE.TXDCTL i) txdctl;
-          let virtual_addresses = (* maybe fill with null buffers to avoid indirections *)
-            Array.init num_tx_queue_entries ~f:(fun _ -> None) in
-          { descriptors = descriptor_ring.virt;
-            num_entries = num_tx_queue_entries;
-            clean_index = 0;
-            tx_index = 0;
-            virtual_addresses;
-          }) in
-  t.set_reg IXGBE.DMATXCTL IXGBE.DMATXCTL.te;
-  t.txqs <- txqs
+  if t.num_txq > 0 then begin
+    (* enable crc offload and small packet padding *)
+    t.set_flags IXGBE.HLREG0 (IXGBE.HLREG0.txcrcen lor IXGBE.HLREG0.txpaden);
+    t.set_reg (IXGBE.TXPBSIZE 0) IXGBE.TXPBSIZE._40KB;
+    for i = 1 to 7 do
+      t.set_reg (IXGBE.TXPBSIZE i) 0
+    done;
+    t.set_reg IXGBE.DTXMXSZRQ 0xFFFF;
+    t.clear_flags IXGBE.RTTDCS IXGBE.RTTDCS.arbdis;
+    let txqs =
+      Array.init
+        t.num_txq
+        ~f:(fun i ->
+            debug "initializing txq %d" i;
+            let ring_size_bytes =
+              num_tx_queue_entries * tx_descriptor_bytes in
+            let descriptor_ring =
+              Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
+            for j = 0 to ring_size_bytes - 1 do
+              Memory.write8 descriptor_ring.virt j 0xFF
+            done;
+            (* set base address *)
+            t.set_reg (IXGBE.TDBAL i) Int64.(to_int_exn @@ descriptor_ring.phys land 0xFFFFFFFFL);
+            t.set_reg (IXGBE.TDBAH i) Int64.(to_int_exn @@ descriptor_ring.phys lsr 32);
+            (* set ring length *)
+            t.set_reg (IXGBE.TDLEN i) ring_size_bytes;
+            debug "tx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
+            let txdctl =
+              t.get_reg (IXGBE.TXDCTL i) in
+            let txdctl =
+              txdctl land ((lnot 0x3F) lor (0x3F lsl 8) lor (0x3F lsl 16)) in
+            let txdctl =
+              txdctl lor (36 lor (8 lsl 8) lor (4 lsl 16)) in
+            t.set_reg (IXGBE.TXDCTL i) txdctl;
+            let virtual_addresses = (* maybe fill with null buffers to avoid indirections *)
+              Array.init num_tx_queue_entries ~f:(fun _ -> None) in
+            { descriptors = descriptor_ring.virt;
+              num_entries = num_tx_queue_entries;
+              clean_index = 0;
+              tx_index = 0;
+              virtual_addresses;
+            }) in
+    t.set_reg IXGBE.DMATXCTL IXGBE.DMATXCTL.te;
+    t.txqs <- txqs
+  end
 
 let start_tx t i =
   info "starting txq %d" i;
