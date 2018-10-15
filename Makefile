@@ -2,7 +2,7 @@ JBUILDER=jbuilder build
 JBUILDERFLAGS=-j 4
 
 TEST=memory check_nic mmap uname pci_config
-APPS=echo fwd
+APPS=echo fwd pktgen
 
 all: ${TEST} ${APPS}
 

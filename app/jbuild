@@ -13,3 +13,10 @@
   (modes (native))
   (libraries (ixy))
   (modules (fwd))))
+
+(executable
+ ((name pktgen)
+  (public_name pktgen)
+  (modes (native))
+  (libraries (core ixy))
+  (modules (pktgen))))
