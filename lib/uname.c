@@ -5,12 +5,14 @@
 #include <caml/alloc.h>
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
+#include <caml/unixsupport.h>
 
-CAMLprim value caml_uname(value unit) {
+CAMLprim value ixy_uname(value unit) {
     CAMLparam1(unit);
     CAMLlocal1(result);
     struct utsname name;
-    uname(&name);
+    if (uname(&name))
+        uerror("uname", Nothing);
     result = caml_alloc(5, 0);
     Field(result, 0) = caml_copy_string(name.sysname);
     Field(result, 1) = caml_copy_string(name.nodename);

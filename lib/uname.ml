@@ -6,4 +6,16 @@ type utsname = {
   machine : string
 }
 
-external uname : unit -> utsname = "caml_uname"
+external uname : unit -> utsname = "ixy_uname"
+
+let utsname = uname () (* only evaluate uname once *)
+
+let sysname = utsname.sysname
+
+let nodename = utsname.nodename
+
+let release = utsname.release
+
+let version = utsname.version
+
+let machine = utsname.machine

@@ -1,9 +1,9 @@
-type utsname = {
-  sysname : string;
-  nodename : string;
-  release : string;
-  version : string;
-  machine : string
-}
+val sysname : string
 
-external uname : unit -> utsname = "caml_uname"
+val nodename : string
+
+val release : string
+
+val version : string
+
+val machine : string
