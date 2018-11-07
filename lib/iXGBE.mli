@@ -1,35 +1,13 @@
 val max_queues : int (* maximum number of queues *)
 
-module ADV_RXD : sig
-  val stat_dd : int (* descriptor done *)
-
-  val stat_eop : int (* end of packet *)
-end
-
-module ADV_TXD : sig
-  val stat_dd : int
-
-  val dcmd_eop : int
-
-  val dcmd_rs : int
-
-  val dcmd_ifcs : int
-
-  val dcmd_dext : int
-
-  val dtyp_data : int
-
-  val paylen_shift : int
-end
-
 module EIMC : sig
-  type t = int
+  type t = int32
 
   val interrupt_disable : t
 end
 
 module SPEED : sig
-  type t = int
+  type t = int32
 
   val _10G : t (* 10 Gigabit/s *)
 
@@ -39,7 +17,7 @@ module SPEED : sig
 end
 
 module LINKS : sig
-  type t = int
+  type t = int32
 
   val up : t
 
@@ -47,7 +25,7 @@ module LINKS : sig
 end
 
 module CTRL : sig
-  type t = int
+  type t = int32
 
   val lnk_rst : t
 
@@ -57,7 +35,7 @@ module CTRL : sig
 end
 
 module MACC : sig
-  type t = int
+  type t = int32
 
   val flu : t
 
@@ -66,28 +44,14 @@ module MACC : sig
   val fs : t
 end
 
-module LEDCTL : sig
-  type t = int
-
-  type led = [ `LED0 | `LED1 | `LED2 | `LED3 ]
-
-  val mode_mask : led -> int
-
-  val mode_shift : led -> int
-
-  val blink : led -> int
-
-  val link_active : t
-end
-
 module EEC : sig
-  type t = int
+  type t = int32
 
   val ard : t
 end
 
 module RDRXCTL : sig
-  type t = int
+  type t = int32
 
   val dmaidone : t
 
@@ -95,7 +59,7 @@ module RDRXCTL : sig
 end
 
 module AUTOC : sig
-  type t = int
+  type t = int32
 
   val lms_mask : t
 
@@ -107,19 +71,19 @@ module AUTOC : sig
 end
 
 module RXCTRL : sig
-  type t = int
+  type t = int32
 
   val rxen : t
 end
 
 module RXPBSIZE : sig
-  type t = int
+  type t = int32
 
   val _128KB : t
 end
 
 module HLREG0 : sig
-  type t = int
+  type t = int32
 
   val txcrcen : t
 
@@ -129,13 +93,13 @@ module HLREG0 : sig
 end
 
 module FCTRL : sig
-  type t = int
+  type t = int32
 
   val bam : t
 end
 
 module SRRCTL : sig
-  type t = int
+  type t = int32
 
   val desctype_mask : t
 
@@ -145,84 +109,82 @@ module SRRCTL : sig
 end
 
 module CTRL_EXT : sig
-  type t = int
+  type t = int32
 
   val ns_dis : t
 end
 
 module RXDCTL : sig
-  type t = int
+  type t = int32
 
   val enable : t
 end
 
 module TXPBSIZE : sig
-  type t = int
+  type t = int32
 
   val _40KB : t
 end
 
 module RTTDCS : sig
-  type t = int
+  type t = int32
 
   val arbdis : t (* DCB arbiter disable *)
 end
 
 module TXDCTL : sig
-  type t = int
+  type t = int32
 
   val enable : t
 end
 
 module DMATXCTL : sig
-  type t = int
+  type t = int32
 
   val te : t (* transmit enable *)
 end
 
-(* FIXME add custom type for every variant *)
 (* FIXME reorder registers to allow sorting by offset range *)
-type _ register =
-  | LEDCTL : LEDCTL.t register (* LED control *)
-  | LINKS : LINKS.t register (* link status *)
-  | MACC : MACC.t register (* used in the linux ixgbe driver *)
-  | EIMC : EIMC.t register (* extended interrupt mask clear *)
-  | CTRL : CTRL.t register (* device control *)
-  | CTRL_EXT : CTRL_EXT.t register (* extended device control *)
-  | EEC : EEC.t register (* EEPROM flash control *)
-  | RDRXCTL : RDRXCTL.t register (* receive DMA control *)
-  | AUTOC : AUTOC.t register (* auto-negotiaton control *)
-  | RXCTRL : RXCTRL.t register (* receive control *)
-  | RXPBSIZE : int -> RXPBSIZE.t register (* receive packet buffer size *)
-  | HLREG0 : HLREG0.t register (* MAC core control 0 *)
-  | FCTRL : FCTRL.t register (* filter control *)
-  | SRRCTL : int -> SRRCTL.t register (* split receive control *)
-  | RDBAL : int -> int register (* receive descriptor base address low *)
-  | RDBAH : int -> int register (* receive descriptor base address high *)
-  | RDLEN : int -> int register (* receive descriptor length *)
-  | RDH : int -> int register (* receive descriptor head *)
-  | RDT : int -> int register (* receive descriptor tail *)
-  | DCA_RXCTRL : int -> int register (* receive DCA control *)
-  | RXDCTL : int -> RXDCTL.t register (* receive descriptor control *)
-  | TXPBSIZE : int -> TXPBSIZE.t register (* transmit packet buffer size *)
-  | DTXMXSZRQ : int register (* DMA tx TCP max allow size requests *)
-  | RTTDCS : RTTDCS.t register (* DCB transmit descriptor plane control and status *)
-  | TDBAL : int -> int register (* transmit descriptor base address low *)
-  | TDBAH : int -> int register (* transmit descriptor base address high *)
-  | TDLEN : int -> int register (* transmit descriptor length *)
-  | TDH : int -> int register (* transmit descriptor head *)
-  | TDT : int -> int register (* transmit descriptor tail *)
-  | TXDCTL : int -> TXDCTL.t register (* transmit descriptor control *)
-  | DMATXCTL : DMATXCTL.t register (* DMA tx control *)
+type register =
+  | LINKS (* link status *)
+  | MACC (* used in the linux ixgbe driver *)
+  | EIMC (* extended interrupt mask clear *)
+  | CTRL (* device control *)
+  | CTRL_EXT (* extended device control *)
+  | EEC (* EEPROM flash control *)
+  | RDRXCTL (* receive DMA control *)
+  | AUTOC (* auto-negotiaton control *)
+  | RXCTRL (* receive control *)
+  | RXPBSIZE of int(* receive packet buffer size *)
+  | HLREG0 (* MAC core control 0 *)
+  | FCTRL (* filter control *)
+  | SRRCTL of int (* split receive control *)
+  | RDBAL of int (* receive descriptor base address low *)
+  | RDBAH of int (* receive descriptor base address high *)
+  | RDLEN of int (* receive descriptor length *)
+  | RDH of int (* receive descriptor head *)
+  | RDT of int (* receive descriptor tail *)
+  | DCA_RXCTRL of int (* receive DCA control *)
+  | RXDCTL of int (* receive descriptor control *)
+  | TXPBSIZE of int (* transmit packet buffer size *)
+  | DTXMXSZRQ (* DMA tx TCP max allow size requests *)
+  | RTTDCS (* DCB transmit descriptor plane control and status *)
+  | TDBAL of int (* transmit descriptor base address low *)
+  | TDBAH of int (* transmit descriptor base address high *)
+  | TDLEN of int (* transmit descriptor length *)
+  | TDH of int (* transmit descriptor head *)
+  | TDT of int (* transmit descriptor tail *)
+  | TXDCTL of int (* transmit descriptor control *)
+  | DMATXCTL (* DMA tx control *)
 
-val get_reg : PCI.hw -> 'a register -> int
+val get_reg : PCI.hw -> register -> int32
 
-val set_reg : PCI.hw -> 'a register -> 'a -> unit
+val set_reg : PCI.hw -> register -> int32 -> unit
 
-val set_flags : PCI.hw -> 'a register -> 'a -> unit
+val set_flags : PCI.hw -> register -> int32 -> unit
 
-val clear_flags : PCI.hw -> 'a register -> 'a -> unit
+val clear_flags : PCI.hw -> register -> int32 -> unit
 
-val wait_set : PCI.hw -> 'a register -> 'a -> unit
+val wait_set : PCI.hw -> register -> int32 -> unit
 
-val wait_clear : PCI.hw -> 'a register -> 'a -> unit
+val wait_clear : PCI.hw -> register -> int32 -> unit

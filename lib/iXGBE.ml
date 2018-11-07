@@ -2,227 +2,186 @@ open Core
 
 let max_queues = 64
 
-module ADV_RXD = struct
-  let stat_dd = 0x01
-
-  let stat_eop = 0x02
-end
-
-module ADV_TXD = struct
-  let stat_dd = 0x01
-
-  let dcmd_eop = 0x01000000
-
-  let dcmd_rs = 0x08000000
-
-  let dcmd_ifcs = 0x02000000
-
-  let dcmd_dext = 0x20000000
-
-  let dtyp_data = 0x00300000
-
-  let paylen_shift = 14
-end
-
 module EIMC = struct
-  type t = int
+  type t = int32
 
-  let interrupt_disable = 0x7FFFFFFF
+  let interrupt_disable = 0x7FFFFFFFl
 end
 
 module SPEED = struct
-  type t = int
+  type t = int32
 
-  let _10G = 0x30000000
+  let _10G = 0x30000000l
 
-  let _1G = 0x20000000
+  let _1G = 0x20000000l
 
-  let _100 = 0x10000000
+  let _100 = 0x10000000l
 end
 
 module LINKS = struct
-  type t = int
+  type t = int32
 
-  let up = 0x40000000
+  let up = 0x40000000l
 
-  let speed_82599 = 0x30000000
+  let speed_82599 = 0x30000000l
 end
 
 module CTRL = struct
-  type t = int
+  type t = int32
 
-  let lnk_rst = 0x00000008
+  let lnk_rst = 0x00000008l
 
-  let rst = 0x04000000
+  let rst = 0x04000000l
 
-  let ctrl_rst_mask = lnk_rst lor rst
+  let ctrl_rst_mask = Int32.(lnk_rst lor rst)
 end
 
 module MACC = struct
-  type t = int
+  type t = int32
 
-  let flu = 0x00000001
+  let flu = 0x00000001l
 
-  let fsv = 0x00030000
+  let fsv = 0x00030000l
 
-  let fs = 0x00040000
-end
-
-module LEDCTL = struct
-  type t = int
-
-  type led = [ `LED0 | `LED1 | `LED2 | `LED3 ] [@@deriving enum]
-
-  let mode_mask led =
-    0x0000000F lsl (8 * (led_to_enum led))
-
-  let mode_shift led =
-    8 * (led_to_enum led)
-
-  let blink led =
-    0x00000080 lsl (8 * (led_to_enum led))
-
-  let link_active = 0x4
+  let fs = 0x00040000l
 end
 
 module EEC = struct
-  type t = int
+  type t = int32
 
-  let ard = 0x00000200 (* EEPROM Auto Read Done *)
+  let ard = 0x00000200l (* EEPROM Auto Read Done *)
 end
 
 module RDRXCTL = struct
-  type t = int
+  type t = int32
 
-  let dmaidone = 0x00000008 (* DMA init cycle done *)
+  let dmaidone = 0x00000008l (* DMA init cycle done *)
 
-  let crcstrip = 0x00000002
+  let crcstrip = 0x00000002l
 end
 
 module AUTOC = struct
-  type t = int
+  type t = int32
 
   let lms_shift = 13
 
-  let lms_mask = 0x7 lsl lms_shift
+  let lms_mask = Int32.(0x7l lsl lms_shift)
 
-  let lms_10G_serial = 0x3 lsl lms_shift
+  let lms_10G_serial = Int32.(0x3l lsl lms_shift)
 
-  let _10G_pma_pmd_mask = 0x00000180
+  let _10G_pma_pmd_mask = 0x00000180l
 
-  let an_restart = 0x00001000
+  let an_restart = 0x00001000l
 end
 
 module RXCTRL = struct
-  type t = int
+  type t = int32
 
-  let rxen = 0x00000001
+  let rxen = 0x00000001l
 end
 
 module RXPBSIZE = struct
-  type t = int
+  type t = int32
 
-  let _128KB = 0x00020000
+  let _128KB = 0x00020000l
 end
 
 module HLREG0 = struct
-  type t = int
+  type t = int32
 
-  let txcrcen = 0x00000001
+  let txcrcen = 0x00000001l
 
-  let rxcrcstrp = 0x00000002
+  let rxcrcstrp = 0x00000002l
 
-  let txpaden = 0x00000400
+  let txpaden = 0x00000400l
 end
 
 module FCTRL = struct
-  type t = int
+  type t = int32
 
-  let bam = 0x00000400 (* Broadcast Accept Mode *)
+  let bam = 0x00000400l (* Broadcast Accept Mode *)
 end
 
 module SRRCTL = struct
-  type t = int
+  type t = int32
 
-  let desctype_mask = 0x0E000000
+  let desctype_mask = 0x0E000000l
 
-  let desctype_adv_onebuf = 0x02000000
+  let desctype_adv_onebuf = 0x02000000l
 
-  let drop_en = 0x10000000
+  let drop_en = 0x10000000l
 end
 
 module CTRL_EXT = struct
-  type t = int
+  type t = int32
 
-  let ns_dis = 0x00010000
+  let ns_dis = 0x00010000l
 end
 
 module RXDCTL = struct
-  type t = int
+  type t = int32
 
-  let enable = 0x02000000
+  let enable = 0x02000000l
 end
 
 module TXPBSIZE = struct
-  type t = int
+  type t = int32
 
-  let _40KB = 0x0000A000
+  let _40KB = 0x0000A000l
 end
 
 module RTTDCS = struct
-  type t = int
+  type t = int32
 
-  let arbdis = 0x00000040
+  let arbdis = 0x00000040l
 end
 
 module TXDCTL = struct
-  type t = int
+  type t = int32
 
-  let enable = 0x02000000
+  let enable = 0x02000000l
 end
 
 module DMATXCTL = struct
-  type t = int
+  type t = int32
 
-  let te = 0x1
+  let te = 0x1l
 end
 
-type _ register =
-  | LEDCTL : LEDCTL.t register (* LED control *)
-  | LINKS : LINKS.t register (* link status *)
-  | MACC : MACC.t register (* used in the linux ixgbe driver *)
-  | EIMC : EIMC.t register (* extended interrupt mask clear *)
-  | CTRL : CTRL.t register (* device control *)
-  | CTRL_EXT : CTRL_EXT.t register (* extended device control *)
-  | EEC : EEC.t register (* EEPROM flash control *)
-  | RDRXCTL : RDRXCTL.t register (* receive DMA control *)
-  | AUTOC : AUTOC.t register (* auto-negotiaton control *)
-  | RXCTRL : RXCTRL.t register (* receive control *)
-  | RXPBSIZE : int -> RXPBSIZE.t register (* receive packet buffer size *)
-  | HLREG0 : HLREG0.t register (* MAC core control 0 *)
-  | FCTRL : FCTRL.t register (* filter control *)
-  | SRRCTL : int -> SRRCTL.t register (* split receive control *)
-  | RDBAL : int -> int register (* receive descriptor base address low *)
-  | RDBAH : int -> int register (* receive descriptor base address high *)
-  | RDLEN : int -> int register (* receive descriptor length *)
-  | RDH : int -> int register (* receive descriptor head *)
-  | RDT : int -> int register (* receive descriptor tail *)
-  | DCA_RXCTRL : int -> int register (* receive DCA control *)
-  | RXDCTL : int -> RXDCTL.t register (* receive descriptor control *)
-  | TXPBSIZE : int -> TXPBSIZE.t register (* transmit packet buffer size *)
-  | DTXMXSZRQ : int register (* DMA tx TCP max allow size requests *)
-  | RTTDCS : RTTDCS.t register (* DCB transmit descriptor plane control and status *)
-  | TDBAL : int -> int register (* transmit descriptor base address low *)
-  | TDBAH : int -> int register (* transmit descriptor base address high *)
-  | TDLEN : int -> int register (* transmit descriptor length *)
-  | TDH : int -> int register (* transmit descriptor head *)
-  | TDT : int -> int register (* transmit descriptor tail *)
-  | TXDCTL : int -> TXDCTL.t register (* transmit descriptor control *)
-  | DMATXCTL : DMATXCTL.t register (* DMA tx control *)
+type register =
+  | LINKS (* link status *)
+  | MACC (* used in the linux ixgbe driver *)
+  | EIMC (* extended interrupt mask clear *)
+  | CTRL (* device control *)
+  | CTRL_EXT (* extended device control *)
+  | EEC (* EEPROM flash control *)
+  | RDRXCTL (* receive DMA control *)
+  | AUTOC (* auto-negotiaton control *)
+  | RXCTRL (* receive control *)
+  | RXPBSIZE of int(* receive packet buffer size *)
+  | HLREG0 (* MAC core control 0 *)
+  | FCTRL (* filter control *)
+  | SRRCTL of int (* split receive control *)
+  | RDBAL of int (* receive descriptor base address low *)
+  | RDBAH of int (* receive descriptor base address high *)
+  | RDLEN of int (* receive descriptor length *)
+  | RDH of int (* receive descriptor head *)
+  | RDT of int (* receive descriptor tail *)
+  | DCA_RXCTRL of int (* receive DCA control *)
+  | RXDCTL of int (* receive descriptor control *)
+  | TXPBSIZE of int (* transmit packet buffer size *)
+  | DTXMXSZRQ (* DMA tx TCP max allow size requests *)
+  | RTTDCS (* DCB transmit descriptor plane control and status *)
+  | TDBAL of int (* transmit descriptor base address low *)
+  | TDBAH of int (* transmit descriptor base address high *)
+  | TDLEN of int (* transmit descriptor length *)
+  | TDH of int (* transmit descriptor head *)
+  | TDT of int (* transmit descriptor tail *)
+  | TXDCTL of int (* transmit descriptor control *)
+  | DMATXCTL (* DMA tx control *)
 
-let register_to_int (type t) (register : t register) : int =
+let register_to_int register =
   match register with
-  | LEDCTL -> 0x00200
   | LINKS -> 0x042A4
   | MACC -> 0x04330
   | EIMC -> 0x00888
@@ -292,7 +251,6 @@ let register_to_int (type t) (register : t register) : int =
 
 let register_to_string register =
   match register with
-  | LEDCTL -> "LEDCTL"
   | LINKS -> "LINKS"
   | MACC -> "MACC"
   | EIMC -> "EIMC"
@@ -324,60 +282,24 @@ let register_to_string register =
   | TXDCTL i -> sprintf "TXDCTL[%d]" i
   | DMATXCTL -> "DMATXCTL"
 
-let get_reg (type t) hw (register : t register) : int =
-  if Ixy_dbg.testing then
-    0
-  else
-    Memory.read32 hw (register_to_int register)
+let get_reg hw register =
+  Cstruct.LE.get_uint32 hw (register_to_int register)
 
-(* TODO there has to be a better way to do this*)
-let set_reg (type t) hw (register : t register) (v : t) =
-  let register = (Obj.magic register : int register) in
-  if Ixy_dbg.testing then
-    ()
-  else
-    Memory.write32 hw (register_to_int register) (Obj.magic v : int)
+let set_reg hw register data =
+  Cstruct.LE.set_uint32 hw (register_to_int register) data
 
-let set_flags (type t) hw (register : t register) (flags : t) =
-  let register = (Obj.magic register : int register) in
-  if Ixy_dbg.testing then
-    ()
-  else
-    set_reg hw register (get_reg hw register lor (Obj.magic flags : int))
+let set_flags hw register flags =
+  set_reg hw register Int32.((get_reg hw register) lor flags)
 
-let clear_flags (type t) hw (register : t register) (flags : t) =
-  let register = (Obj.magic register : int register) in
-  if Ixy_dbg.testing then
-    ()
-  else
-    set_reg hw register (get_reg hw register lor (lnot (Obj.magic flags : int)))
+let clear_flags hw register flags =
+  set_reg hw register Int32.((get_reg hw register) land (lnot flags))
 
-let wait_set (type t) hw (reg : t register) (mask : t) =
-  let reg = (Obj.magic reg : int register) in
-  let mask = (Obj.magic mask : int) in
-  if Ixy_dbg.testing then
-    ()
-  else
-    while get_reg hw reg land mask <> mask do
-      ignore @@ Unix.nanosleep 0.01;
-      Log.debug
-        "waiting for flags %#08X in reg %s(%#05Xr)"
-        mask
-        (register_to_string reg)
-        (register_to_int reg)
-    done
+let wait_clear hw register mask =
+  while Int32.((get_reg hw register) land mask <> 0l) do
+    ignore @@ Unix.nanosleep 0.01
+  done
 
-let wait_clear (type t) hw (reg : t register) (mask : t) =
-  let reg = (Obj.magic reg : int register) in
-  let mask = (Obj.magic mask : int) in
-  if Ixy_dbg.testing then
-    ()
-  else
-    while get_reg hw reg land mask <> 0 do
-      ignore @@ Unix.nanosleep 0.01;
-      Log.debug
-        "waiting for flags %#08X in reg %s(%#05Xr)"
-        mask
-        (register_to_string reg)
-        (register_to_int reg)
-    done
+let wait_set hw register mask =
+  while Int32.((get_reg hw register) land mask <> mask) do
+    ignore @@ Unix.nanosleep 0.01
+  done
