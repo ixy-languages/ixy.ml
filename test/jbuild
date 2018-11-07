@@ -15,13 +15,6 @@
   (modules (memory))))
 
 (executable
- ((name mmap)
-  (public_name mmap)
-  (modes (native))
-  (libraries (core ixy))
-  (modules (mmap))))
-
-(executable
  ((name uname)
   (public_name uname)
   (modes (native))
