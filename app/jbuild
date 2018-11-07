@@ -18,5 +18,6 @@
  ((name pktgen)
   (public_name pktgen)
   (modes (native))
-  (libraries (core ixy))
+  (libraries (core cstruct ixy))
+  (preprocess (pps (ppx_deriving.enum ppx_cstruct)))
   (modules (pktgen))))

@@ -4,92 +4,97 @@ let packet_size = 60
 
 let batch_size = 64
 
-let packet_data =
-  let calc_ip_checksum data =
-    let cksum =
-      String.fold
-        data
-        ~init:0
-        ~f:(fun acc c ->
-            let x = acc + Char.to_int c in
-            if x > 0xffff then (x land 0xffff) + 1 else x)
-      |> (lnot) in
-    sprintf
-      "%c%c"
-      (Char.of_int_exn @@ cksum lsr 8)
-      (Char.of_int_exn @@ cksum land 0xff) in
-  let dst_mac = "\x01\x02\x03\x04\x05\x06" in
-  let src_mac = "\x11\x12\x13\x14\x15\x16" in
-  let ethertype = "\x08\x00" in
-  let version_ihl_tos = "\x45\x00" in
-  let ip_len =
-    let hi = Char.of_int_exn @@ packet_size - 14 lsr 8 in
-    let lo = Char.of_int_exn @@ packet_size - 14 land 0xff in
-    sprintf "%c%c" hi lo in
-  let id_flags_fragmentation = "\x00\x00\x00\x00" in
-  let ttl = "\x40" in
-  let proto = "\x11" in
-  let ip_cksum = "\x00\x00" in (* TODO calc checksum *)
-  let src_ip = "\x0a\x00\x00\x01" in
-  let dst_ip = "\x0a\x00\x00\x02" in
-  let src_port = "\x00\x2a" in
-  let dst_port = "\x05\x39" in
-  let udp_len =
-    let hi = Char.of_int_exn @@ packet_size - 20 lsr 8 in
-    let lo = Char.of_int_exn @@ packet_size - 20 land 0xff in
-    sprintf "%c%c" hi lo in
-  let udp_cksum = "\x00\x00" in
-  let payload = "ixy" in
-  let data =
-    String.concat
-      [ dst_mac;
-        src_mac;
-        ethertype;
-        version_ihl_tos;
-        ip_len;
-        id_flags_fragmentation;
-        ttl;
-        proto;
-        ip_cksum;
-        src_ip;
-        dst_ip;
-        src_port;
-        dst_port;
-        udp_len;
-        udp_cksum;
-        payload
-      ] in
-  let checksum = Bytes.of_string @@ calc_ip_checksum data in
-  let data = Bytes.of_string data in
-  Bytes.blit ~src:checksum ~src_pos:0 ~dst:data ~dst_pos:24 ~len:2;
-  data
+[%%cstruct
+  type ethernet = {
+    dst : uint8 [@len 6];
+    src : uint8 [@len 6];
+    ethertype : uint16
+  } [@@big_endian]
+]
+
+[%%cstruct
+  type ipv4 = {
+    version_ihl : uint8;
+    tos : uint8;
+    len : uint16;
+    id : uint16;
+    off : uint16;
+    ttl : uint8;
+    proto : uint8;
+    csum : uint16;
+    src : uint8 [@len 4];
+    dst : uint8 [@len 4];
+  } [@@big_endian]
+]
+
+[%%cstruct
+  type udp = {
+    src : uint16;
+    dst : uint16;
+    len : uint16;
+    csum : uint16
+  } [@@big_endian]
+]
+
+let pkt_data =
+  let calc_ip_checksum buf =
+    let ipv4 = Cstruct.sub buf sizeof_ethernet sizeof_ipv4 in
+    let iter =
+      Cstruct.iter
+        (fun cs -> if Cstruct.len cs > 0 then Some 2 else None)
+        (fun cs -> Cstruct.BE.get_uint16 cs 0)
+        ipv4 in
+    let sum = Cstruct.fold ( + ) iter 0 in
+    let carry = (sum land 0xf0000) lsr 16 in
+    (lnot ((sum land 0xffff) + carry)) land 0xffff in
+  let buf = Cstruct.create packet_size in
+  set_ethernet_dst "\x01\x02\x03\x04\x05\x06" 0 buf;
+  set_ethernet_src "\x11\x12\x13\x14\x15\x16" 0 buf;
+  set_ethernet_ethertype buf 0x8000;
+  let ipv4 = Cstruct.shift buf sizeof_ethernet in
+  set_ipv4_version_ihl ipv4 0x45;
+  set_ipv4_tos ipv4 0x00;
+  set_ipv4_len ipv4 (packet_size - sizeof_ethernet);
+  set_ipv4_id ipv4 0x00;
+  set_ipv4_off ipv4 0x00;
+  set_ipv4_ttl ipv4 64;
+  set_ipv4_proto ipv4 0x11;
+  (* Cstruct.create zero-fills the buffer; no need to clear csum *)
+  set_ipv4_src "\x0a\x00\x00\x01" 0 buf;
+  set_ipv4_dst "\x0a\x00\x00\x02" 0 buf;
+  set_ipv4_csum ipv4 (calc_ip_checksum buf);
+  let udp = Cstruct.shift ipv4 sizeof_ipv4 in
+  set_udp_src udp 42;
+  set_udp_dst udp 1337;
+  set_udp_len udp (packet_size - sizeof_ethernet - sizeof_ipv4);
+  set_udp_csum udp 0;
+  let payload = Cstruct.shift udp sizeof_udp in
+  Cstruct.blit_from_string "ixy" 0 payload 0 3;
+  buf (* rest of the payload is zero-filled *)
+
+let usage () =
+  Ixy.Log.error "Usage: %s <pci_addr>" Sys.argv.(0)
 
 let () =
   if Array.length Sys.argv <> 2 then
-    Ixy.Log.error "Usage: %s <pci_addr>" Sys.argv.(0);
-  let dev = Ixy.create ~pci_addr:Sys.argv.(1) ~rxq:0 ~txq:1 in
-  let num_bufs = 2048 in
-  let mempool = Ixy.Memory.allocate_mempool ~entry_size:2048 ~num_entries:num_bufs in
-  let packets = Ixy.Memory.pkt_buf_alloc_batch mempool ~num_bufs in
-  if Array.length packets <> num_bufs then
-    Ixy.Log.error "could not allocate %d packet buffers" num_bufs;
-  Array.iter packets ~f:(fun pkt_buf ->
-      Ixy.Memory.pkt_buf_resize pkt_buf packet_size;
-      Bytes.blit
-        ~src:packet_data
-        ~src_pos:0
-        ~len:(Bytes.length packet_data)
-        ~dst:(Ixy.Memory.pkt_buf_get_data pkt_buf)
-        ~dst_pos:0
-    );
-  Array.iter packets ~f:Ixy.Memory.pkt_buf_free;
+    usage ();
+  let pci_addr =
+    match Ixy.PCI.of_string Sys.argv.(1) with
+    | None -> usage ()
+    | Some pci -> pci in
+  let dev = Ixy.create ~pci_addr ~rxq:0 ~txq:1 in
+  let mempool =
+    Ixy.Memory.allocate_mempool
+      ~pre_fill:pkt_data
+      ~num_entries:2048 in
+  let seq_num = ref 0l in
   while true do
-    let packets =
-      Array.to_list @@ Ixy.Memory.pkt_buf_alloc_batch mempool ~num_bufs:batch_size in
-    let rec loop tx =
-      match Ixy.tx_batch dev 0 tx with
-      | [] -> ()
-      | rest -> loop rest in
-    loop packets
+    let bufs =
+      Ixy.Memory.pkt_buf_alloc_batch mempool ~num_bufs:batch_size in
+    Array.iter
+      bufs
+      ~f:(fun Ixy.Memory.{ data; _ } ->
+          Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
+          Int32.incr seq_num);
+    Ixy.tx_batch_busy_wait ~clean_large:false dev 0 bufs;
   done
-
