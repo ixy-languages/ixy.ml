@@ -31,6 +31,12 @@ You will need `core`, `cstruct-unix`, `ppx_cstruct` and `ppx_deriving`. Install 
 opam install core cstruct-unix ppx_cstruct ppx_deriving
 ```
 
+Build API documentation using:
+
+```
+make documentation
+```
+
 ## Usage
 
 ### Library

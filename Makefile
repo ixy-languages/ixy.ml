@@ -1,10 +1,10 @@
 JBUILDER=jbuilder build
 JBUILDERFLAGS=-j 4
 
-TEST=memory check_nic uname pci_config
+TEST=check_nic uname pci_config
 APPS=echo fwd pktgen
 
-all: ${TEST} ${APPS}
+all: ${TEST} ${APPS} documentation
 
 apps: ${APPS}
 
@@ -15,6 +15,9 @@ ${TEST}:
 
 ${APPS}:
 	${JBUILDER} app/$@.exe ${JBUILDERFLAGS}
+
+documentation:
+	${JBUILDER} @doc
 
 clean:
 	jbuilder clean
