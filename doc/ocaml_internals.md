@@ -76,7 +76,7 @@ OCaml offers a foreign function interface (ffi) that allows OCaml programs to ca
 
 ```ocaml
 external add_int_and_float : int -> float -> float = "caml_add_int_and_float"
-(* C functions that are called from OCaml are commonly prefixed with "caml_" *)
+(* C functions that are called from OCaml are commonly prefixed with the name of the library *)
 ```
 
 ### Using a foreign function

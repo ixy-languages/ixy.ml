@@ -74,6 +74,12 @@ square 2
 
 ### Partial application
 
+In OCaml and many other functional languages, functions can be partially applied.
+A partial application returns a function that accepts the initially missing parameters.
+
+For example our `add : int -> int -> int` function returns the sum of two integers.
+If we provide one of the two parameters, we get a function that returns the sum of this integer (in this example `2`) and another integer.
+
 ```ocaml
 let add2 : int -> int = add 2
 ```
@@ -94,6 +100,8 @@ let rec apply_n_times ~n ~f x =
 ```
 
 ### Lambda
+
+Functions don't have to be have names; they can be constructed as lambdas (also called function literal, anonymous function).
 
 ```ocaml
 fun x -> x + 1 (* function that maps each integer to its successor *)
@@ -182,7 +190,7 @@ let rec len list = (* rec indicates that this function is recursive *)
 ### Tail recursion
 
 Tail recursion can be used to prevent stack overflows due to looping recursion.
-When all recursive calls of a functions are "last calls" (i.e. there are no calculations done after the recursive call returns) the current calls stack frame can be reused for the recursive call.
+When all recursive calls of a functions are "last calls" (i.e. there are no calculations done after the recursive call returns) the current call's stack frame can be reused for the recursive call.
 
 The `len` function from the previous section can be optimized like so:
 
