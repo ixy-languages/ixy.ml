@@ -3,10 +3,12 @@
 ixy.ml is an OCaml rewrite of the [ixy](https://github.com/emmericp/ixy) userspace network driver.
 It is designed to be readable, idiomatic OCaml code.
 It supports Intel 82599 10GbE NICs (`ixgbe` family).
+ixy.ml is still work-in-progress.
 
 ## Features
 
-* blink LEDs
+* multiple receive and transmit queues
+* simple API
 
 ## Build instructions
 
@@ -23,10 +25,10 @@ make
 make install
 ```
 
-You will need `core`. Install using:
+You will need `core`, `cstruct-unix`, `ppx_cstruct` and `ppx_deriving`. Install using:
 
 ```
-opam install core
+opam install core cstruct-unix ppx_cstruct ppx_deriving
 ```
 
 ## Usage
