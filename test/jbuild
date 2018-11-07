@@ -8,13 +8,6 @@
   (modules (check_nic))))
 
 (executable
- ((name memory)
-  (public_name memory)
-  (modes (native))
-  (libraries (core ixy))
-  (modules (memory))))
-
-(executable
  ((name uname)
   (public_name uname)
   (modes (native))
