@@ -107,7 +107,24 @@ Bits 32 through 47 of the second word of the write-back format indicate the rece
 
 ## Transmit Descriptors (tx descriptors)
 
-(TODO add this section)
+This chapter only details Advanced Receive Descriptors (7.2.3.2.4).
+
+Like an rx descriptor, a tx descriptor is 16 bytes/2 words in size.
+It, too, has read and write-back formats.
+
+### Read Format
+
+The read format contains the physical address of a packet buffer that is to be transmitted.
+Additionally there are a number of flags that need to be set.
+Finally the payload's length needs to be specified.
+See [`lib/tXD.ml`](../lib/tXD.ml).
+
+### Write-back Format
+
+The write-back format consists almost entirely of reserved bits (according to the datasheet).
+The only actual flag is the DD flag.
+Once this flag has been set, the NIC has transmitted the packet stored in the corresponding packet buffer.
+The packet buffer is then ready to be cleaned.
 
 ## Descriptor Ring
 
@@ -129,7 +146,7 @@ Each queue maintains its own mempool as well as its own descriptor ring.
 The descriptor ring gets filled with empty packet buffers.
 Head and tail pointers are set to the same value; in our case 0.
 The queues additionally need to maintain a mapping from descriptor ring index to packet buffer since the rx descriptor itself only contains a physical address of the packet buffer and this physical address gets overwritten by the NIC during the write-back phase.
-Both ixy and ixy.ml use the `virtual_addresses` array within each queue.
+ixy uses the `virtual_addresses` array in its queue while ixy.ml uses `pkt_bufs`.
 
 ### Active phase
 
