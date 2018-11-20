@@ -11,7 +11,7 @@ val to_string : t -> string
 (** [to_string t] returns the string representation of [t]. *)
 
 type hw = Cstruct.t
-(** type of register files (also called [hw] in the linux ixgbe driver) *)
+(** Type of register files (also called [hw] in the linux ixgbe driver). *)
 
 val map_resource : t -> hw
 (** [map_resource pci_addr] *)
@@ -29,4 +29,4 @@ val get_config : t -> pci_config
 (** [get_config t] returns the PCIe configuration space for [t]. *)
 
 val vendor_intel : int
-(** Intel's vendor ID. *)
+(** Intel's vendor ID ([0x8086] in little endian). *)

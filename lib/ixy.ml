@@ -22,19 +22,19 @@ let rx_descriptor_bytes = 16
 let tx_descriptor_bytes = 16
 
 type rxq = {
-  descriptors : RXD.t array;
-  mempool : Memory.mempool;
-  num_entries : int;
-  mutable rx_index : int; (* descriptor ring tail pointer  *)
-  pkt_bufs : Memory.pkt_buf array;
+  descriptors : RXD.t array; (** RX descriptor ring. *)
+  mempool : Memory.mempool; (** [mempool] from which to allocate receive buffers. *)
+  num_entries : int; (** Number of descriptors in the ring. *)
+  mutable rx_index : int; (** Descriptor ring tail pointer. *)
+  pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. *)
 }
 
 type txq = {
-  descriptors : TXD.t array;
-  num_entries : int;
-  mutable clean_index : int; (* first unclean descriptor *)
-  mutable tx_index : int; (* descriptor ring tail pointer *)
-  pkt_bufs : Memory.pkt_buf option array; (* TODO might be unboxed *)
+  descriptors : TXD.t array; (** TX descriptor ring. *)
+  num_entries : int; (** Number of descriptors in the ring. *)
+  mutable clean_index : int; (** Pointer to first unclean descriptor. *)
+  mutable tx_index : int; (** Descriptor ring tail pointer. *)
+  pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. Initially filled with [Memory.dummy]. *)
 }
 
 type t = {
@@ -206,7 +206,7 @@ let init_tx t =
             t.set_reg (IXGBE.TXDCTL i) txdctl_magic_bits;
             let descriptors = TXD.split descriptor_ring.virt in
             let pkt_bufs = (* maybe fill with null buffers to avoid indirections *)
-              Array.create num_tx_queue_entries None in
+              Array.create num_tx_queue_entries Memory.dummy in
             { descriptors;
               num_entries = num_tx_queue_entries;
               clean_index = 0;
@@ -283,6 +283,7 @@ let create ~pci_addr ~rxq ~txq =
   done;
   t
 
+(* TODO remove the + 1 *)
 let wrap_ring index size = (index + 1) land (size - 1) [@@inline always]
 
 let rx_batch t rxq_id =
@@ -332,10 +333,7 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
     let cleanup_to =
       wrap_ring (txq.clean_index + offset - 1) txq.num_entries in
     let rec loop i =
-      begin match txq.pkt_bufs.(i) with
-      | None -> error "no buffer to free at index %d" i
-      | Some buf -> Memory.pkt_buf_free buf
-      end;
+      Memory.pkt_buf_free txq.pkt_bufs.(i);
       if i <> cleanup_to then
         loop (wrap_ring i txq.num_entries)
       else
@@ -357,7 +355,7 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
   let n = Int.min num_free_descriptors (Array.length bufs) in
   for i = 0 to n - 1 do
     (* send packet *)
-    TXD.reset txq.descriptors.(txq.tx_index + i) bufs.(i)
+    TXD.reset txq.descriptors.(wrap_ring (txq.tx_index + i - 1) txq.num_entries) bufs.(i)
   done;
   txq.tx_index <- txq.tx_index + n;
   t.set_reg (IXGBE.TDT txq_id) (Int32.of_int_exn txq.tx_index);

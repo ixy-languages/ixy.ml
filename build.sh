@@ -24,3 +24,4 @@ make apps
 # symlink into current directory
 ln -fs _build/default/app/echo.exe echo
 ln -fs _build/default/app/fwd.exe fwd
+ln -fs _build/default/app/pktgen.exe pktgen

@@ -21,7 +21,8 @@ type mempool
 val allocate_mempool : ?pre_fill:Cstruct.t -> num_entries:int -> mempool
 (** [allocate_mempool ?pre_fill:data ~num_entries:n] allocates a mempool with
     [n] packet buffers. If [pre_fill] is provided, the packet buffers will be
-    initialized with [data]. Otherwise the [pkt_buf]s are zeroed. *)
+    initialized with [data] and their length will be set to [pre_fill]'s length.
+    Otherwise the [pkt_buf]s are zeroed and their initial size will be set to [2048]. *)
 
 val num_free_bufs : mempool -> int
 (** [num_free_bufs mempool] returns the number of free buffer's in [mempool]. *)
