@@ -7,16 +7,19 @@
 apt-get update
 apt-get install ocaml opam m4 -y
 
-# initialize new opam state
-opam init -y
+if [ ! -d "~/.opam" ]; then
+  # initialize new opam state
+  opam init -y
 
-# install OCaml 4.07.0
-opam update
-opam switch 4.07.0
+  # install OCaml 4.07.0
+  opam update
+  opam switch 4.07.0
+
+  # install ixy
+  opam pin add . -y
+fi
+
 eval `opam config env`
-
-# install ixy
-opam pin add . -y
 
 # build apps (echo, fwd, ...)
 make apps
