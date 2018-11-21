@@ -81,23 +81,33 @@ and pkt_buf = {
   data : Cstruct.t
 }
 
+let dummy =
+  let dummy_pool =
+    { entry_size = 0;
+      num_entries = 0;
+      free = 0;
+      free_bufs = [||]
+    } in
+  { phys = 0L;
+    mempool = dummy_pool;
+    size = 0;
+    data = Cstruct.empty
+  }
+
 let allocate_mempool ?pre_fill ~num_entries =
   let entry_size = 2048 in (* entry_size is fixed for now *)
   if huge_page_size mod entry_size <> 0 then
     error "entry size must be a divisor of huge page size (%d)" huge_page_size;
   let { virt; _ } =
     allocate_dma ~require_contiguous:false (num_entries * entry_size) in
-  (* We need laziness here because OCaml doesn't allow function application
-   * in recursive value defintions. See OCaml manual section 8.2. *)
   Cstruct.memset virt 0; (* might not be necessary *)
-  let rec mempool =
-    lazy
-      { entry_size;
-        num_entries;
-        free = num_entries;
-        free_bufs = Array.init num_entries ~f:init_buf
-      }
-  and init_buf index =
+  let mempool =
+    { entry_size;
+      num_entries;
+      free = num_entries;
+      free_bufs = Array.create ~len:num_entries dummy
+    } in
+  let init_buf index =
     let data =
       Cstruct.sub virt (index * entry_size) entry_size in
     let size =
@@ -108,11 +118,14 @@ let allocate_mempool ?pre_fill ~num_entries =
         len
       | None -> entry_size in
     { phys = virt_to_phys data;
-      mempool = Lazy.force mempool;
+      mempool;
       size;
       data
     } in
-  Lazy.force mempool
+  Array.iteri
+    mempool.free_bufs
+    ~f:(fun i _ -> mempool.free_bufs.(i) <- init_buf i);
+  mempool
 
 let num_free_bufs { free; _ } = free
 
@@ -147,16 +160,3 @@ let pkt_buf_resize ({ mempool = { entry_size }; _ } as buf) ~size =
     buf.size <- size
   else
     error "0 < size <= %d is not fulfilled; size = %d" entry_size size
-
-let dummy =
-  let dummy_pool =
-    { entry_size = 0;
-      num_entries = 0;
-      free = 0;
-      free_bufs = [||]
-    } in
-  { phys = 0L;
-    mempool = dummy_pool;
-    size = 0;
-    data = Cstruct.empty
-  }
