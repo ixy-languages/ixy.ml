@@ -11,20 +11,30 @@ external int64_of_addr : Cstruct.t -> Cstruct.uint64 = "ixy_int64_of_addr"
 external mlock : Cstruct.t -> unit = "ixy_mlock"
 
 let virt_to_phys virt =
+  if Obj.is_int (Obj.repr virt) then
+    raise (Invalid_argument "virt must be a pointer");
   let pagesize =
     match Unix.(sysconf PAGESIZE) with
     | None -> error "cannot get pagesize"
     | Some n -> n in
-  let addr = int64_of_addr virt in
-  let offset = Int64.(to_int_exn @@ addr / pagesize * 8L) in
   let fd = Unix.(openfile ~mode:[O_RDONLY] "/proc/self/pagemap") in
-  (* maybe not necessary to mmap the file? also we only have 62 bits (sign, tag) *)
-  let cs = Unix_cstruct.of_fd fd in
-  let phy = Cstruct.LE.get_uint64 cs offset in
+  let addr = int64_of_addr virt in
+  let offset = Int64.(addr / pagesize * 8L) in
+  if Unix.(lseek fd offset ~mode:SEEK_SET <> offset) then
+    error "lseek unsuccessful";
+  let buf = Bytes.create 8 in
+  if Unix.(read fd ~buf <> 8) then
+    error "read unsuccessful";
   Unix.close fd;
-  if phy = 0L then
-    error "failed to translate virt %018Lx to phys" addr;
-  Int64.((phy land 0x7fffffffffffffL) * pagesize + (rem addr pagesize))
+  let phys =
+    let f i =
+      let i64 =
+        Bytes.get buf i
+        |> Char.to_int
+        |> Int64.of_int in
+      Int64.shift_left i64 (i * 8) in
+    Int64.(f 0 + f 1 + f 2 + f 3 + f 4 + f 5 + f 6 + f 7) in
+  Int64.((phys land 0x7f_ff_ff_ff_ff_ff_ffL) * pagesize + (addr % pagesize))
 
 let huge_page_id = ref 0
 
