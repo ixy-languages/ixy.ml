@@ -4,9 +4,8 @@ type t
 val sizeof : int
 (** [sizeof] is the size of a receive descriptor in bytes. Equal to 16. *)
 
-val split : Cstruct.t -> t array
-(** [split cstruct] splits [cstruct] into a number of receive descriptors.
-    Fails if [cstruct]'s length is not divisible by 16. *)
+val split : int -> Cstruct.t -> t array
+(** [split n cstruct] splits [cstruct] into [n] receive descriptors. *)
 
 val dd : t -> bool
 (** [dd rxd] returns [true] if [rxd]'s stat_dd bit is set,

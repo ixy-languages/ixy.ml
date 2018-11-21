@@ -36,12 +36,12 @@ let eop t = Int32.((get_adv_rxd_wb_status_error t) land stat_eop <> 0l)
 
 let size t = get_adv_rxd_wb_length t
 
-let split cs =
+let split num cs =
   let len = Cstruct.len cs in
-  if len mod sizeof <> 0 then
-    error "length (%d) is not divisible by %d" len sizeof;
+  if num * sizeof > len then
+    error "cstruct is too small (%d bytes) for %d descriptors" len num;
   Array.init
-    (len / sizeof)
+    num
     ~f:(fun i -> Cstruct.sub cs (i * sizeof) sizeof)
 
 let reset cs Memory.{ phys; _ } =

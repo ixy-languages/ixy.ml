@@ -117,7 +117,10 @@ let init_rx t =
               Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
             (* set all descriptor bytes to 0xFF to prevent memory problems *)
             Cstruct.memset descriptor_ring.virt 0xFF;
-            let descriptors = RXD.split descriptor_ring.virt in
+            let descriptors =
+              RXD.split
+                num_rx_queue_entries
+                descriptor_ring.virt in
             (* set base address *)
             t.set_reg (IXGBE.RDBAL i) Int64.(to_int32_exn @@ descriptor_ring.phys land 0xFFFFFFFFL);
             t.set_reg (IXGBE.RDBAH i) Int64.(to_int32_exn @@ descriptor_ring.phys lsr 32);
@@ -204,7 +207,10 @@ let init_tx t =
               land ((lnot 0x3Fl) lor (0x3Fl lsl 8) lor (0x3Fl lsl 16))
               lor (36l lor (8l lsl 8) lor (4l lsl 16)) in
             t.set_reg (IXGBE.TXDCTL i) txdctl_magic_bits;
-            let descriptors = TXD.split descriptor_ring.virt in
+            let descriptors =
+              TXD.split
+                num_tx_queue_entries
+                descriptor_ring.virt in
             let pkt_bufs = (* maybe fill with null buffers to avoid indirections *)
               Array.create num_tx_queue_entries Memory.dummy in
             { descriptors;
@@ -238,15 +244,15 @@ let create ~pci_addr ~rxq ~txq =
     PCI.get_config pci_addr in
   let pci_addr_str = PCI.to_string pci_addr in
   begin match class_code, subclass, prog_if, vendor with
-  | 0x2, 0x0, 0x0, v when v = PCI.vendor_intel -> ()
-  | 0x1, 0x0, 0x0, v when v = PCI.vendor_intel -> (* TODO make these errors *)
-    warn "device %s is configured as SCSI storage device in EEPROM" pci_addr_str
-  | 0x2, 0x0, _, v when v <> PCI.vendor_intel ->
-    warn "device %s is a non-Intel NIC (vendor: %#x)" pci_addr_str vendor
-  | 0x2, _, _, _ ->
-    warn "device %s is not an Ethernet NIC (subclass: %#x)" pci_addr_str subclass
-  | _ ->
-    warn "device %s is not a NIC (class: %#x)" pci_addr_str class_code
+    | 0x2, 0x0, 0x0, v when v = PCI.vendor_intel -> ()
+    | 0x1, 0x0, 0x0, v when v = PCI.vendor_intel -> (* TODO make these errors *)
+      warn "device %s is configured as SCSI storage device in EEPROM" pci_addr_str
+    | 0x2, 0x0, _, v when v <> PCI.vendor_intel ->
+      warn "device %s is a non-Intel NIC (vendor: %#x)" pci_addr_str vendor
+    | 0x2, _, _, _ ->
+      warn "device %s is not an Ethernet NIC (subclass: %#x)" pci_addr_str subclass
+    | _ ->
+      warn "device %s is not a NIC (class: %#x)" pci_addr_str class_code
   end;
   info "device %s has device id %#x" pci_addr_str device_id;
   let hw =

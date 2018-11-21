@@ -4,9 +4,8 @@ type t
 val sizeof : int
 (** [sizeof] is the size of a transmit descriptor in bytes. Equal to 16. *)
 
-val split : Cstruct.t -> t array
-(** [split cstruct] splits [cstruct] into a number of transmit descriptors.
-    Fails if [cstruct]'s length is not divisible by 16. *)
+val split : int -> Cstruct.t -> t array
+(** [split n cstruct] splits [cstruct] into [n] transmit descriptors. *)
 
 val dd : t -> bool
 (** [dd txd] returns true if [txd]'s stat_dd bit is set,
