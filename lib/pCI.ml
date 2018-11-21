@@ -15,9 +15,11 @@ type hw = Cstruct.t
 let remove_driver t =
   let path =
     sprintf "/sys/bus/pci/devices/%s/driver/unbind" t in
-  let oc = Out_channel.create path in
-  Out_channel.output_string oc t;
-  Out_channel.close oc
+  try
+    let oc = Out_channel.create path in
+    Out_channel.output_string oc t;
+    Out_channel.close oc
+  with Sys_error _ -> Log.debug "no driver loaded"
 
 let conf_path t =
   sprintf "/sys/bus/pci/devices/%s/config" t
@@ -70,7 +72,6 @@ type pci_config = {
     class_code : uint8_t
   } [@@little_endian] (* PCI configuration space is always little endian *)
 ]
-
 
 let get_config t =
   if Ixy_dbg.testing then
