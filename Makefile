@@ -4,7 +4,7 @@ JBUILDERFLAGS=-j 4
 TEST=check_nic uname pci_config
 APPS=echo fwd pktgen
 
-all: ${TEST} ${APPS} documentation
+all: ${TEST} ${APPS}
 
 apps: ${APPS}
 
