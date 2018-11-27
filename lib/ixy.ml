@@ -24,14 +24,12 @@ let tx_descriptor_bytes = 16
 type rxq = {
   descriptors : RXD.t array; (** RX descriptor ring. *)
   mempool : Memory.mempool; (** [mempool] from which to allocate receive buffers. *)
-  num_entries : int; (** Number of descriptors in the ring. *)
   mutable rx_index : int; (** Descriptor ring tail pointer. *)
   pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. *)
 }
 
 type txq = {
   descriptors : TXD.t array; (** TX descriptor ring. *)
-  num_entries : int; (** Number of descriptors in the ring. *)
   mutable clean_index : int; (** Pointer to first unclean descriptor. *)
   mutable tx_index : int; (** Descriptor ring tail pointer. *)
   pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. Initially filled with [Memory.dummy]. *)
@@ -143,7 +141,6 @@ let init_rx t =
                 ~num_bufs:num_rx_queue_entries in
             { descriptors;
               mempool;
-              num_entries = num_rx_queue_entries;
               rx_index = 0;
               pkt_bufs
             }
@@ -161,7 +158,7 @@ let init_rx t =
 let start_rx t i =
   info "starting rxq %d" i;
   let rxq = t.rxqs.(i) in
-  if rxq.num_entries land (rxq.num_entries - 1) <> 0 then
+  if num_tx_queue_entries land (num_rx_queue_entries - 1) <> 0 then
     error "number of rx queue entries must be a power of 2";
   (* reset all descriptors *)
   Array.iter2_exn
@@ -171,7 +168,7 @@ let start_rx t i =
   t.set_flags (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
   t.wait_set (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
   t.set_reg (IXGBE.RDH i) 0l;
-  t.set_reg (IXGBE.RDT i) Int32.((of_int_exn rxq.num_entries) - 1l)
+  t.set_reg (IXGBE.RDT i) Int32.((of_int_exn num_rx_queue_entries) - 1l)
 
 let init_tx t =
   if t.num_txq > 0 then begin
@@ -214,7 +211,6 @@ let init_tx t =
             let pkt_bufs = (* maybe fill with null buffers to avoid indirections *)
               Array.create num_tx_queue_entries Memory.dummy in
             { descriptors;
-              num_entries = num_tx_queue_entries;
               clean_index = 0;
               tx_index = 0;
               pkt_bufs;
@@ -225,8 +221,7 @@ let init_tx t =
 
 let start_tx t i =
   info "starting txq %d" i;
-  let txq = t.txqs.(i) in
-  if txq.num_entries land (txq.num_entries - 1) <> 0 then
+  if num_tx_queue_entries land (num_tx_queue_entries - 1) <> 0 then
     error "number of tx queue entries must be a power of 2";
   t.set_reg (IXGBE.TDH i) 0l;
   t.set_reg (IXGBE.TDT i) 0l;
@@ -289,15 +284,14 @@ let create ~pci_addr ~rxq ~txq =
   done;
   t
 
-(* TODO remove the + 1 *)
-let wrap_ring index size = (index + 1) land (size - 1) [@@inline always]
-
 let rx_batch t rxq_id =
-  let { descriptors; rx_index; num_entries; pkt_bufs; mempool } as rxq =
+  let wrap_rx index =
+    index land (num_rx_queue_entries - 1) in
+  let { descriptors; rx_index; pkt_bufs; mempool } as rxq =
     t.rxqs.(rxq_id) in
   let num_done =
     let rec loop i =
-      let rxd = descriptors.(wrap_ring (rx_index + i - 1) num_entries) in
+      let rxd = descriptors.(wrap_rx (rx_index + i)) in
       if RXD.dd rxd then
         if not (RXD.eop rxd) then
           error "jumbo frames are not supported"
@@ -312,9 +306,9 @@ let rx_batch t rxq_id =
     if Array.length empty_bufs <> num_done then
       error "could not allocate enough buffers";
     let receive offset =
-      let index = wrap_ring (rx_index + offset - 1) num_entries in
-      let buf = pkt_bufs.(index) in
-      let rxd = descriptors.(index) in
+      let index = wrap_rx (rx_index + offset) in
+      debug "receiving at index %d" index;
+      let buf, rxd = pkt_bufs.(index), descriptors.(index) in
       Memory.pkt_buf_resize buf (RXD.size rxd);
       let new_buf = empty_bufs.(offset) in
       RXD.reset descriptors.(index) new_buf;
@@ -322,28 +316,30 @@ let rx_batch t rxq_id =
       buf in
     Array.init num_done ~f:receive in
   if num_done > 0 then begin
-    rxq.rx_index <- wrap_ring (rx_index + num_done - 1) num_entries;
+    rxq.rx_index <- wrap_rx (rx_index + num_done - 1);
     t.set_reg (IXGBE.RDT rxq_id) (Int32.of_int_exn rxq.rx_index)
   end;
   bufs
 
 let tx_batch ?(clean_large = false) t txq_id bufs =
+  let wrap_tx index =
+    index land (num_tx_queue_entries - 1) in
   let txq = t.txqs.(txq_id) in
   (* returns wether or not the descriptor at clean_index + offset can be cleaned *)
   let check offset =
-    if txq.clean_index + offset land (txq.num_entries - 1) >= txq.tx_index then
+    if wrap_tx (txq.clean_index + offset) >= txq.tx_index then
       false
-    else
-      TXD.dd txq.descriptors.(wrap_ring (txq.clean_index + offset) txq.num_entries) in
+    else (* TODO check this index *)
+      TXD.dd txq.descriptors.(wrap_tx (txq.clean_index + offset)) in
   let clean_ahead offset =
     let cleanup_to =
-      wrap_ring (txq.clean_index + offset - 1) txq.num_entries in
+      wrap_tx (txq.clean_index + offset - 1) in
     let rec loop i =
       Memory.pkt_buf_free txq.pkt_bufs.(i);
       if i <> cleanup_to then
-        loop (wrap_ring i txq.num_entries)
+        loop (wrap_tx i)
       else
-        txq.clean_index <- wrap_ring cleanup_to txq.num_entries in
+        txq.clean_index <- wrap_tx cleanup_to in
     loop txq.clean_index in
   if clean_large then begin
     if check 128 then (* possibly quicker batching *)
@@ -357,20 +353,22 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
       clean_ahead tx_clean_batch
     done;
   let num_free_descriptors = (* TODO check this calculation *)
-    (txq.clean_index - txq.tx_index) land (txq.num_entries - 1) in
+    wrap_tx (txq.clean_index - txq.tx_index) in
   let n = Int.min num_free_descriptors (Array.length bufs) in
   for i = 0 to n - 1 do
     (* send packet *)
-    TXD.reset txq.descriptors.(wrap_ring (txq.tx_index + i - 1) txq.num_entries) bufs.(i)
+    TXD.reset txq.descriptors.(wrap_tx (txq.tx_index + i)) bufs.(i)
   done;
   txq.tx_index <- txq.tx_index + n;
   t.set_reg (IXGBE.TDT txq_id) (Int32.of_int_exn txq.tx_index);
   Array.sub bufs ~pos:n ~len:(Array.length bufs - n)
 
 let tx_batch_busy_wait ?clean_large t txq_id bufs =
-  while tx_batch ?clean_large t txq_id bufs <> [||] do
-    ()
-  done
+  let rec send bufs =
+    let rest = tx_batch ?clean_large t txq_id bufs in
+    if rest <> [||] then
+      send rest in
+  send bufs
 
 let check_link t =
   let links_reg = t.get_reg IXGBE.LINKS in

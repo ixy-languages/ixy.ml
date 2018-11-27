@@ -15,7 +15,6 @@ val num_tx_queue_entries : int
 type rxq = private {
   descriptors : RXD.t array; (** RX descriptor ring. *)
   mempool : Memory.mempool; (** [mempool] from which to allocate receive buffers. *)
-  num_entries : int; (** Number of descriptors in the ring. *)
   mutable rx_index : int; (** Descriptor ring tail pointer. *)
   pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. *)
 }
@@ -23,7 +22,6 @@ type rxq = private {
 
 type txq = private {
   descriptors : TXD.t array; (** TX descriptor ring. *)
-  num_entries : int; (** Number of descriptors in the ring. *)
   mutable clean_index : int; (** Pointer to first unclean descriptor. *)
   mutable tx_index : int; (** Descriptor ring tail pointer. *)
   pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. Initially filled with [Memory.dummy]. *)
