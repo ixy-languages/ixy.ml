@@ -1,5 +1,3 @@
-val max_queues : int (* maximum number of queues *)
-
 module EIMC : sig
   type t = int32
 
@@ -144,6 +142,14 @@ module DMATXCTL : sig
   val te : t (* transmit enable *)
 end
 
+module LEDCTL : sig
+  type t = int32
+
+  val led_on : int32 -> int -> int32
+
+  val led_off : int32 -> int -> int32
+end
+
 (* FIXME reorder registers to allow sorting by offset range *)
 type register =
   | LINKS (* link status *)
@@ -176,6 +182,7 @@ type register =
   | TDT of int (* transmit descriptor tail *)
   | TXDCTL of int (* transmit descriptor control *)
   | DMATXCTL (* DMA tx control *)
+  | LEDCTL (* LED control *)
 
 val get_reg : PCI.hw -> register -> int32
 

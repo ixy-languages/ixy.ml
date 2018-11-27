@@ -1,7 +1,5 @@
 open Core
 
-let max_queues = 64
-
 module EIMC = struct
   type t = int32
 
@@ -148,6 +146,23 @@ module DMATXCTL = struct
   let te = 0x1l
 end
 
+module LEDCTL = struct
+  type t = int32
+
+  let mode_mask index =
+    Int32.shift_left 0xFl (8 * index)
+
+  let mode_shift index = 8 * index
+
+  let led_on old index =
+    let masked = Int32.(old land (lnot (mode_mask index))) in
+    Int32.(masked lor (0xEl lsl (mode_shift index)))
+
+  let led_off old index =
+    let masked = Int32.(old land (lnot (mode_mask index))) in
+    Int32.(masked lor (0xFl lsl (mode_shift index)))
+end
+
 type register =
   | LINKS (* link status *)
   | MACC (* used in the linux ixgbe driver *)
@@ -179,6 +194,7 @@ type register =
   | TDT of int (* transmit descriptor tail *)
   | TXDCTL of int (* transmit descriptor control *)
   | DMATXCTL (* DMA tx control *)
+  | LEDCTL (* LED control *)
 
 let register_to_int register =
   match register with
@@ -248,6 +264,7 @@ let register_to_int register =
   | TDT i -> 0x06018 + (i * 0x40)
   | TXDCTL i -> 0x06028 + (i * 0x40)
   | DMATXCTL -> 0x04A80
+  | LEDCTL -> 0x00200
 
 let register_to_string register =
   match register with
@@ -281,6 +298,7 @@ let register_to_string register =
   | TDT i -> sprintf "TDT[%d]" i
   | TXDCTL i -> sprintf "TXDCTL[%d]" i
   | DMATXCTL -> "DMATXCTL"
+  | LEDCTL -> "LEDCTL"
 
 let get_reg hw register =
   Cstruct.LE.get_uint32 hw (register_to_int register)

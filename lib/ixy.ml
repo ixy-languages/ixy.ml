@@ -10,6 +10,10 @@ module Log = Log
 
 module PCI = PCI
 
+module IXGBE = IXGBE
+
+let max_queues = 64
+
 let max_rx_queue_entries = 4096
 let max_tx_queue_entries = 4096
 
@@ -231,10 +235,10 @@ let start_tx t i =
 let create ~pci_addr ~rxq ~txq =
   if Unix.getuid () <> 0 then
     warn "not running as root, this will probably fail";
-  if rxq > IXGBE.max_queues then
-    error "cannot configure %d rx queues (max: %d)" rxq IXGBE.max_queues;
-  if txq > IXGBE.max_queues then
-    error "cannot configure %d tx queues (max: %d)" txq IXGBE.max_queues;
+  if rxq > max_queues then
+    error "cannot configure %d rx queues (max: %d)" rxq max_queues;
+  if txq > max_queues then
+    error "cannot configure %d tx queues (max: %d)" txq max_queues;
   let PCI.{ vendor; device_id; class_code; subclass; prog_if } =
     PCI.get_config pci_addr in
   let pci_addr_str = PCI.to_string pci_addr in

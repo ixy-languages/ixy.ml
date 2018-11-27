@@ -1,3 +1,5 @@
+val max_queues : int (* maximum number of queues *)
+
 val max_rx_queue_entries : int
 (** Maximum number of receive queue entries. *)
 
@@ -79,3 +81,6 @@ module Log = Log
 
 module PCI = PCI
 (** PCIe interface via sysfs. *)
+
+module IXGBE = IXGBE
+(** Register access. *)
