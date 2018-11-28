@@ -54,7 +54,7 @@ let allocate_dma ?(require_contiguous = true) size =
   incr huge_page_id;
   let fd = Unix.(openfile ~mode:[O_CREAT; O_RDWR] ~perm:0o777 path) in
   Unix.ftruncate fd ~len:(Int64.of_int size);
-  let virt = Unix_cstruct.of_fd fd in
+  let virt = Util.mmap fd in
   assert (Cstruct.len virt = size); (* TODO maybe remove this later? *)
   mlock virt;
   Unix.close fd;

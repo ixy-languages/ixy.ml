@@ -42,12 +42,7 @@ let map_resource t =
   enable_dma t;
   let path = sprintf "/sys/bus/pci/devices/%s/resource0" t in
   let fd = Unix.(openfile ~mode:[O_RDWR] path) in
-  (* we need our own version of 'Unix_cstruct.of_fd' to map the file as shared. *)
-  let of_fd fd =
-    let genarray =
-      Bigarray.(Caml.Unix.map_file fd char c_layout true [|-1|]) in
-    Cstruct.of_bigarray (Bigarray.array1_of_genarray genarray) in
-  let hw = of_fd fd in
+  let hw = Util.mmap fd in
   (* ixy doesn't do this but there shouldn't be a reason to keep fd around *)
   Unix.close fd;
   hw

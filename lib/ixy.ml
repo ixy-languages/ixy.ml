@@ -84,9 +84,6 @@ let init_link ra =
     Int32.(autoc land (lnot IXGBE.AUTOC._10G_pma_pmd_mask));
   ra.set_flags IXGBE.AUTOC IXGBE.AUTOC.an_restart
 
-let split i64 =
-  (Obj.magic Int64.(i64 land 0xFFFFFFFFL, i64 lsr 32) : int32 * int32)
-
 let init_rx ra n =
   (* disable RX while configuring *)
   ra.clear_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen;
@@ -122,7 +119,7 @@ let init_rx ra n =
           num_rx_queue_entries
           descriptor_ring.virt in
       (* set base address *)
-      let lo, hi = split descriptor_ring.phys in
+      let lo, hi = Util.split descriptor_ring.phys in
       ra.set_reg (IXGBE.RDBAL i) lo;
       ra.set_reg (IXGBE.RDBAH i) hi;
       (* set ring length *)
@@ -192,7 +189,7 @@ let init_tx ra n =
         Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
       Cstruct.memset descriptor_ring.virt 0xff;
       (* set base address *)
-      let lo, hi = split descriptor_ring.phys in
+      let lo, hi = Util.split descriptor_ring.phys in
       ra.set_reg (IXGBE.TDBAL i) lo;
       ra.set_reg (IXGBE.TDBAH i) hi;
       (* set ring length *)
