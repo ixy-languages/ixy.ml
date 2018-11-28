@@ -22,9 +22,6 @@ let num_tx_queue_entries = 512
 
 let tx_clean_batch = 32
 
-let rx_descriptor_bytes = 16
-let tx_descriptor_bytes = 16
-
 type rxq = {
   descriptors : RXD.t array; (** RX descriptor ring. *)
   mempool : Memory.mempool; (** [mempool] from which to allocate receive buffers. *)
@@ -84,6 +81,9 @@ let init_link t =
     Int32.(autoc land (lnot IXGBE.AUTOC._10G_pma_pmd_mask));
   t.set_flags IXGBE.AUTOC IXGBE.AUTOC.an_restart
 
+let split i64 =
+  (Obj.magic Int64.(i64 land 0xFFFFFFFFL, i64 lsr 32) : int32 * int32)
+
 (* TODO make this return an rxq *)
 let init_rx t =
   (* disable RX while configuring *)
@@ -99,7 +99,6 @@ let init_rx t =
     t.set_flags IXGBE.RDRXCTL IXGBE.RDRXCTL.crcstrip;
     (* accept broadcast *)
     t.set_flags IXGBE.FCTRL IXGBE.FCTRL.bam;
-    (* descriptor is 16 bytes in size *)
     let rxqs =
       Array.init
         t.num_rxq
@@ -114,7 +113,7 @@ let init_rx t =
             t.set_flags (IXGBE.SRRCTL i) IXGBE.SRRCTL.drop_en;
             (* setup descriptor ring *)
             let ring_size_bytes =
-              rx_descriptor_bytes * num_rx_queue_entries in
+              RXD.sizeof * num_rx_queue_entries in
             let descriptor_ring =
               Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
             (* set all descriptor bytes to 0xFF to prevent memory problems *)
@@ -124,8 +123,9 @@ let init_rx t =
                 num_rx_queue_entries
                 descriptor_ring.virt in
             (* set base address *)
-            t.set_reg (IXGBE.RDBAL i) Int64.(to_int32_exn @@ descriptor_ring.phys land 0xFFFFFFFFL);
-            t.set_reg (IXGBE.RDBAH i) Int64.(to_int32_exn @@ descriptor_ring.phys lsr 32);
+            let lo, hi = split descriptor_ring.phys in
+            t.set_reg (IXGBE.RDBAL i) lo;
+            t.set_reg (IXGBE.RDBAH i) hi;
             (* set ring length *)
             t.set_reg (IXGBE.RDLEN i) (Int32.of_int_exn ring_size_bytes);
             debug "rx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
@@ -190,13 +190,14 @@ let init_tx t =
         ~f:(fun i ->
             debug "initializing txq %d" i;
             let ring_size_bytes =
-              num_tx_queue_entries * tx_descriptor_bytes in
+              TXD.sizeof * num_tx_queue_entries in
             let descriptor_ring =
               Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
             Cstruct.memset descriptor_ring.virt 0xff;
             (* set base address *)
-            t.set_reg (IXGBE.TDBAL i) Int64.(to_int32_exn @@ descriptor_ring.phys land 0xFFFFFFFFL);
-            t.set_reg (IXGBE.TDBAH i) Int64.(to_int32_exn @@ descriptor_ring.phys lsr 32);
+            let lo, hi = split descriptor_ring.phys in
+            t.set_reg (IXGBE.TDBAL i) lo;
+            t.set_reg (IXGBE.TDBAH i) hi;
             (* set ring length *)
             t.set_reg (IXGBE.TDLEN i) Int32.(of_int_exn ring_size_bytes);
             debug "tx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
