@@ -87,7 +87,6 @@ let init_link ra =
 let split i64 =
   (Obj.magic Int64.(i64 land 0xFFFFFFFFL, i64 lsr 32) : int32 * int32)
 
-(* TODO make this return an rxq *)
 let init_rx ra n =
   (* disable RX while configuring *)
   ra.clear_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen;
@@ -211,7 +210,7 @@ let init_tx ra n =
         TXD.split
           num_tx_queue_entries
           descriptor_ring.virt in
-      let pkt_bufs = (* maybe fill with null buffers to avoid indirections *)
+      let pkt_bufs =
         Array.create num_tx_queue_entries Memory.dummy in
       { descriptors;
         clean_index = 0;
@@ -241,6 +240,39 @@ let register_access_of_hw hw =
     wait_set = IXGBE.wait_set hw;
     wait_clear = IXGBE.wait_clear hw
   }
+
+let set_promisc ra =
+  ra.set_flags IXGBE.FCTRL IXGBE.FCTRL.pe
+
+let check_link t =
+  let links_reg = t.ra.get_reg IXGBE.LINKS in
+  let speed =
+    match Int32.(links_reg land IXGBE.LINKS.speed_82599) with
+    | speed when speed = IXGBE.SPEED._10G -> `SPEED_10G
+    | speed when speed = IXGBE.SPEED._1G -> `SPEED_1G
+    | speed when speed = IXGBE.SPEED._100 -> `SPEED_100
+    | _ -> `SPEED_UNKNOWN in
+  let link_up = Int32.(links_reg land IXGBE.LINKS.up <> 0l) in
+  (speed, link_up)
+
+let wait_for_link t =
+  let max_wait = 10. in
+  let poll_interval = 0.01 in
+  let rec loop rem =
+    let speed, _ = check_link t in
+    match speed with
+    | `SPEED_UNKNOWN ->
+      if rem > 0. then begin
+        ignore @@ Unix.nanosleep poll_interval;
+        loop (rem -. poll_interval)
+      end
+    | `SPEED_10G ->
+      info "Link speed is 10 Gbit/s"
+    | `SPEED_1G ->
+      info "Link speed is 1 Gbit/s"
+    | `SPEED_100 ->
+      info "Link speed is 100 Mbit/s" in
+  loop max_wait
 
 let create ~pci_addr ~rxq ~txq =
   if Unix.getuid () <> 0 then
@@ -288,6 +320,8 @@ let create ~pci_addr ~rxq ~txq =
   for i = 0 to txq - 1 do
     start_tx t i
   done;
+  set_promisc ra;
+  wait_for_link t;
   t
 
 let rx_batch t rxq_id =
@@ -296,15 +330,15 @@ let rx_batch t rxq_id =
   let { descriptors; rx_index; pkt_bufs; mempool } as rxq =
     t.rxqs.(rxq_id) in
   let num_done =
-    let rec loop i =
-      let rxd = descriptors.(wrap_rx (rx_index + i)) in
+    let rec loop offset =
+      let rxd = descriptors.(wrap_rx (rx_index + offset)) in
       if RXD.dd rxd then
         if not (RXD.eop rxd) then
           error "jumbo frames are not supported"
         else
-          loop (i + 1)
+          loop (offset + 1)
       else
-        i in
+        offset in
     loop 0 in
   let bufs =
     let empty_bufs =
@@ -322,8 +356,8 @@ let rx_batch t rxq_id =
       buf in
     Array.init num_done ~f:receive in
   if num_done > 0 then begin
-    rxq.rx_index <- wrap_rx (rx_index + num_done - 1);
-    t.ra.set_reg (IXGBE.RDT rxq_id) (Int32.of_int_exn rxq.rx_index)
+    rxq.rx_index <- wrap_rx (rx_index + num_done);
+    t.ra.set_reg (IXGBE.RDT rxq_id) (Int32.of_int_exn (wrap_rx (rxq.rx_index - 1)))
   end;
   bufs
 
@@ -333,20 +367,18 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
   let txq = t.txqs.(txq_id) in
   (* returns wether or not the descriptor at clean_index + offset can be cleaned *)
   let check offset =
-    if wrap_tx (txq.clean_index + offset) >= txq.tx_index then
-      false
-    else (* TODO check this index *)
-      TXD.dd txq.descriptors.(wrap_tx (txq.clean_index + offset)) in
+    let cleanable = wrap_tx (txq.tx_index - txq.clean_index) in
+    cleanable >= offset && TXD.dd txq.descriptors.(wrap_tx (txq.clean_index + offset - 1)) in
   let clean_ahead offset =
+    (* cleanup_to points to the first descriptor we won't clean *)
     let cleanup_to =
       wrap_tx (txq.clean_index + offset - 1) in
     let rec loop i =
       Memory.pkt_buf_free txq.pkt_bufs.(i);
       if i <> cleanup_to then
-        loop (wrap_tx i)
-      else
-        txq.clean_index <- wrap_tx cleanup_to in
-    loop txq.clean_index in
+        loop (wrap_tx (i + 1)) in
+    loop txq.clean_index;
+    txq.clean_index <- cleanup_to in
   if clean_large then begin
     if check 128 then (* possibly quicker batching *)
       clean_ahead 128
@@ -358,9 +390,9 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
     while check tx_clean_batch do (* default ixy behavior *)
       clean_ahead tx_clean_batch
     done;
-  let num_free_descriptors = (* TODO check this calculation *)
+  let num_empty_descriptors = (* TODO check this calculation *)
     wrap_tx (txq.clean_index - txq.tx_index) in
-  let n = Int.min num_free_descriptors (Array.length bufs) in
+  let n = Int.min num_empty_descriptors (Array.length bufs) in
   for i = 0 to n - 1 do
     (* send packet *)
     TXD.reset txq.descriptors.(wrap_tx (txq.tx_index + i)) bufs.(i)
@@ -376,14 +408,3 @@ let tx_batch_busy_wait ?clean_large t txq_id bufs =
     if rest <> [||] then
       send rest in
   send bufs
-
-let check_link t =
-  let links_reg = t.ra.get_reg IXGBE.LINKS in
-  let speed =
-    match Int32.(links_reg land IXGBE.LINKS.speed_82599) with
-    | speed when speed = IXGBE.SPEED._10G -> `SPEED_10G
-    | speed when speed = IXGBE.SPEED._1G -> `SPEED_1G
-    | speed when speed = IXGBE.SPEED._100 -> `SPEED_100
-    | _ -> `SPEED_UNKNOWN in
-  let link_up = Int32.(links_reg land IXGBE.LINKS.up <> 0l) in
-  (speed, link_up)

@@ -94,6 +94,8 @@ module FCTRL : sig
   type t = int32
 
   val bam : t
+
+  val pe : t
 end
 
 module SRRCTL : sig

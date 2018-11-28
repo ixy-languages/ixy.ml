@@ -98,6 +98,12 @@ module FCTRL = struct
   type t = int32
 
   let bam = 0x00000400l (* Broadcast Accept Mode *)
+
+  let mpe = 0x00000100l (* Multicast Promiscuous Enable *)
+
+  let upe = 0x00000200l (* Unicast Promiscuous Enable *)
+
+  let pe = Int32.(mpe lor upe) (* Promiscuous Enable *)
 end
 
 module SRRCTL = struct
