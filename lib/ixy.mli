@@ -1,4 +1,5 @@
-val max_queues : int (* maximum number of queues *)
+val max_queues : int
+(** maximum number of queues *)
 
 val max_rx_queue_entries : int
 (** Maximum number of receive queue entries. *)
@@ -30,19 +31,23 @@ type txq = private {
 }
 (** Type of a transmit queue. *)
 
-type t = private {
-  hw : PCI.hw;
-  pci_addr : string;
-  num_rxq : int;
-  mutable rxqs : rxq array; (* TODO mutability needed? *)
-  num_txq : int;
-  mutable txqs : txq array;
+type register_access = private {
   get_reg : IXGBE.register -> int32;
   set_reg : IXGBE.register -> int32 -> unit;
   set_flags : IXGBE.register -> int32 -> unit;
   clear_flags : IXGBE.register -> int32 -> unit;
   wait_set : IXGBE.register -> int32 -> unit;
   wait_clear : IXGBE.register -> int32 -> unit
+}
+(** Type of register access function set. *)
+
+type t = private {
+  pci_addr : string;
+  num_rxq : int;
+  rxqs : rxq array;
+  num_txq : int;
+  txqs : txq array;
+  ra : register_access
 }
 (** Type of an ixgbe NIC. *)
 
@@ -62,9 +67,6 @@ val tx_batch_busy_wait : ?clean_large:bool -> t -> int -> Memory.pkt_buf array -
 (** [tx_batch_busy_wait ~clean_large dev queue bufs] busy waits until all [bufs]
     have been transmitted on [dev]'s queue [queue] by repeatedly calling
     [tx_batch]. *)
-
-val reset : t -> unit (* may need to remove this *)
-(** [reset t] resets the NIC [t]. Do not use [t] after resetting! *)
 
 val check_link : t -> [ `SPEED_10G | `SPEED_1G | `SPEED_100 | `SPEED_UNKNOWN ] * bool
 (** [check_link dev] returns [dev]'s autoconfigured speed and wether

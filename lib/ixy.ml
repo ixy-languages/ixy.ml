@@ -36,19 +36,22 @@ type txq = {
   pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. Initially filled with [Memory.dummy]. *)
 }
 
-type t = {
-  hw : PCI.hw;
-  pci_addr : string;
-  num_rxq : int;
-  mutable rxqs : rxq array; (* TODO mutability needed? *)
-  num_txq : int;
-  mutable txqs : txq array;
+type register_access = {
   get_reg : IXGBE.register -> int32;
   set_reg : IXGBE.register -> int32 -> unit;
   set_flags : IXGBE.register -> int32 -> unit;
   clear_flags : IXGBE.register -> int32 -> unit;
   wait_set : IXGBE.register -> int32 -> unit;
   wait_clear : IXGBE.register -> int32 -> unit
+}
+
+type t = {
+  pci_addr : string;
+  num_rxq : int;
+  rxqs : rxq array;
+  num_txq : int;
+  txqs : txq array;
+  ra : register_access
 }
 
 let () =
@@ -59,105 +62,103 @@ let () =
   else if Sys.big_endian then
     error "ixy.ml only works on little endian systems"
 
-let disable_interrupts t =
+let disable_interrupts ra =
   info "disabling interrupts";
-  t.set_reg IXGBE.EIMC IXGBE.EIMC.interrupt_disable
+  ra.set_reg IXGBE.EIMC IXGBE.EIMC.interrupt_disable
 
-let reset t =
-  info "resetting device %s" t.pci_addr;
-  t.set_reg IXGBE.CTRL IXGBE.CTRL.ctrl_rst_mask;
-  t.wait_clear IXGBE.CTRL IXGBE.CTRL.ctrl_rst_mask;
+let reset ra =
+  info "resetting";
+  ra.set_reg IXGBE.CTRL IXGBE.CTRL.ctrl_rst_mask;
+  ra.wait_clear IXGBE.CTRL IXGBE.CTRL.ctrl_rst_mask;
   ignore @@ Unix.nanosleep 0.01;
   info "reset done"
 
-let init_link t =
-  let autoc = t.get_reg IXGBE.AUTOC in
-  t.set_reg
+let init_link ra =
+  let autoc = ra.get_reg IXGBE.AUTOC in
+  ra.set_reg
     IXGBE.AUTOC
     Int32.((autoc land (lnot IXGBE.AUTOC.lms_mask)) lor IXGBE.AUTOC.lms_10G_serial);
-  let autoc = t.get_reg IXGBE.AUTOC in
-  t.set_reg
+  let autoc = ra.get_reg IXGBE.AUTOC in
+  ra.set_reg
     IXGBE.AUTOC
     Int32.(autoc land (lnot IXGBE.AUTOC._10G_pma_pmd_mask));
-  t.set_flags IXGBE.AUTOC IXGBE.AUTOC.an_restart
+  ra.set_flags IXGBE.AUTOC IXGBE.AUTOC.an_restart
 
 let split i64 =
   (Obj.magic Int64.(i64 land 0xFFFFFFFFL, i64 lsr 32) : int32 * int32)
 
 (* TODO make this return an rxq *)
-let init_rx t =
+let init_rx ra n =
   (* disable RX while configuring *)
-  t.clear_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen;
-  if t.num_rxq > 0 then begin
+  ra.clear_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen;
+  if n > 0 then begin
     (* 128KB packet buffers *)
-    t.set_reg (IXGBE.RXPBSIZE 0) IXGBE.RXPBSIZE._128KB;
+    ra.set_reg (IXGBE.RXPBSIZE 0) IXGBE.RXPBSIZE._128KB;
     for i = 1 to 7 do
-      t.set_reg (IXGBE.RXPBSIZE i) 0l
+      ra.set_reg (IXGBE.RXPBSIZE i) 0l
     done;
     (* enable CRC offload *)
-    t.set_flags IXGBE.HLREG0 IXGBE.HLREG0.rxcrcstrp;
-    t.set_flags IXGBE.RDRXCTL IXGBE.RDRXCTL.crcstrip;
+    ra.set_flags IXGBE.HLREG0 IXGBE.HLREG0.rxcrcstrp;
+    ra.set_flags IXGBE.RDRXCTL IXGBE.RDRXCTL.crcstrip;
     (* accept broadcast *)
-    t.set_flags IXGBE.FCTRL IXGBE.FCTRL.bam;
-    let rxqs =
-      Array.init
-        t.num_rxq
-        ~f:(fun i -> 
-            debug "initializing rxq %d" i;
-            (* enable advanced descriptors *)
-            let srrctl = t.get_reg (IXGBE.SRRCTL i) in
-            t.set_reg
-              (IXGBE.SRRCTL i)
-              Int32.((srrctl land (lnot IXGBE.SRRCTL.desctype_mask)) lor IXGBE.SRRCTL.desctype_adv_onebuf);
-            (* drop packets if no rx descriptors available *)
-            t.set_flags (IXGBE.SRRCTL i) IXGBE.SRRCTL.drop_en;
-            (* setup descriptor ring *)
-            let ring_size_bytes =
-              RXD.sizeof * num_rx_queue_entries in
-            let descriptor_ring =
-              Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
-            (* set all descriptor bytes to 0xFF to prevent memory problems *)
-            Cstruct.memset descriptor_ring.virt 0xFF;
-            let descriptors =
-              RXD.split
-                num_rx_queue_entries
-                descriptor_ring.virt in
-            (* set base address *)
-            let lo, hi = split descriptor_ring.phys in
-            t.set_reg (IXGBE.RDBAL i) lo;
-            t.set_reg (IXGBE.RDBAH i) hi;
-            (* set ring length *)
-            t.set_reg (IXGBE.RDLEN i) (Int32.of_int_exn ring_size_bytes);
-            debug "rx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
-            (* ring head = ring tail = 0
-             * -> ring is empty
-             * -> NIC won't write packets until we start the queue *)
-            t.set_reg (IXGBE.RDH i) 0l;
-            t.set_reg (IXGBE.RDT i) 0l;
-            let mempool_size = num_rx_queue_entries + num_tx_queue_entries in
-            let mempool =
-              Memory.allocate_mempool
-                ?pre_fill:None
-                ~num_entries:(Int.max mempool_size 4096) in
-            let pkt_bufs =
-              Memory.pkt_buf_alloc_batch
-                mempool
-                ~num_bufs:num_rx_queue_entries in
-            { descriptors;
-              mempool;
-              rx_index = 0;
-              pkt_bufs
-            }
-          ) in
+    ra.set_flags IXGBE.FCTRL IXGBE.FCTRL.bam;
+    let init_rxq i =
+      debug "initializing rxq %d" i;
+      (* enable advanced descriptors *)
+      let srrctl = ra.get_reg (IXGBE.SRRCTL i) in
+      ra.set_reg
+        (IXGBE.SRRCTL i)
+        Int32.((srrctl land (lnot IXGBE.SRRCTL.desctype_mask)) lor IXGBE.SRRCTL.desctype_adv_onebuf);
+      (* drop packets if no rx descriptors available *)
+      ra.set_flags (IXGBE.SRRCTL i) IXGBE.SRRCTL.drop_en;
+      (* setup descriptor ring *)
+      let ring_size_bytes =
+        RXD.sizeof * num_rx_queue_entries in
+      let descriptor_ring =
+        Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
+      (* set all descriptor bytes to 0xFF to prevent memory problems *)
+      Cstruct.memset descriptor_ring.virt 0xFF;
+      let descriptors =
+        RXD.split
+          num_rx_queue_entries
+          descriptor_ring.virt in
+      (* set base address *)
+      let lo, hi = split descriptor_ring.phys in
+      ra.set_reg (IXGBE.RDBAL i) lo;
+      ra.set_reg (IXGBE.RDBAH i) hi;
+      (* set ring length *)
+      ra.set_reg (IXGBE.RDLEN i) (Int32.of_int_exn ring_size_bytes);
+      debug "rx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
+      (* ring head = ring tail = 0
+       * -> ring is empty
+       * -> NIC won't write packets until we start the queue *)
+      ra.set_reg (IXGBE.RDH i) 0l;
+      ra.set_reg (IXGBE.RDT i) 0l;
+      let mempool_size = num_rx_queue_entries + num_tx_queue_entries in
+      let mempool =
+        Memory.allocate_mempool
+          ?pre_fill:None
+          ~num_entries:(Int.max mempool_size 4096) in
+      let pkt_bufs =
+        Memory.pkt_buf_alloc_batch
+          mempool
+          ~num_bufs:num_rx_queue_entries in
+      { descriptors;
+        mempool;
+        rx_index = 0;
+        pkt_bufs
+      } in
+    let rxqs = Array.init n ~f:init_rxq in
     (* disable no snoop *)
-    t.set_flags IXGBE.CTRL_EXT IXGBE.CTRL_EXT.ns_dis;
+    ra.set_flags IXGBE.CTRL_EXT IXGBE.CTRL_EXT.ns_dis;
     (* set magic bits *)
-    for i = 0 to t.num_rxq - 1 do
-      t.clear_flags (IXGBE.DCA_RXCTRL i) Int32.(1l lsl 12)
+    for i = 0 to n - 1 do
+      ra.clear_flags (IXGBE.DCA_RXCTRL i) Int32.(1l lsl 12)
     done;
-    t.set_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen; (* warum hier? *)
-    t.rxqs <- rxqs
-  end
+    ra.set_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen; (* warum hier? *)
+    rxqs
+  end else
+    [||]
 
 let start_rx t i =
   info "starting rxq %d" i;
@@ -169,69 +170,77 @@ let start_rx t i =
     rxq.descriptors
     rxq.pkt_bufs
     ~f:RXD.reset;
-  t.set_flags (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
-  t.wait_set (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
-  t.set_reg (IXGBE.RDH i) 0l;
-  t.set_reg (IXGBE.RDT i) Int32.((of_int_exn num_rx_queue_entries) - 1l)
+  t.ra.set_flags (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
+  t.ra.wait_set (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
+  t.ra.set_reg (IXGBE.RDH i) 0l; (* should already be 0l? *)
+  t.ra.set_reg (IXGBE.RDT i) Int32.((of_int_exn num_rx_queue_entries) - 1l)
 
-let init_tx t =
-  if t.num_txq > 0 then begin
+let init_tx ra n =
+  if n > 0 then begin
     (* enable crc offload and small packet padding *)
-    t.set_flags IXGBE.HLREG0 Int32.(IXGBE.HLREG0.txcrcen lor IXGBE.HLREG0.txpaden);
-    t.set_reg (IXGBE.TXPBSIZE 0) IXGBE.TXPBSIZE._40KB;
+    ra.set_flags IXGBE.HLREG0 Int32.(IXGBE.HLREG0.txcrcen lor IXGBE.HLREG0.txpaden);
+    ra.set_reg (IXGBE.TXPBSIZE 0) IXGBE.TXPBSIZE._40KB;
     for i = 1 to 7 do
-      t.set_reg (IXGBE.TXPBSIZE i) 0l
+      ra.set_reg (IXGBE.TXPBSIZE i) 0l
     done;
-    t.set_reg IXGBE.DTXMXSZRQ 0xFFFFl;
-    t.clear_flags IXGBE.RTTDCS IXGBE.RTTDCS.arbdis;
-    let txqs =
-      Array.init
-        t.num_txq
-        ~f:(fun i ->
-            debug "initializing txq %d" i;
-            let ring_size_bytes =
-              TXD.sizeof * num_tx_queue_entries in
-            let descriptor_ring =
-              Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
-            Cstruct.memset descriptor_ring.virt 0xff;
-            (* set base address *)
-            let lo, hi = split descriptor_ring.phys in
-            t.set_reg (IXGBE.TDBAL i) lo;
-            t.set_reg (IXGBE.TDBAH i) hi;
-            (* set ring length *)
-            t.set_reg (IXGBE.TDLEN i) Int32.(of_int_exn ring_size_bytes);
-            debug "tx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
-            let txdctl_old =
-              t.get_reg (IXGBE.TXDCTL i) in
-            let txdctl_magic_bits =
-              let open Int32 in
-              txdctl_old
-              land ((lnot 0x3Fl) lor (0x3Fl lsl 8) lor (0x3Fl lsl 16))
-              lor (36l lor (8l lsl 8) lor (4l lsl 16)) in
-            t.set_reg (IXGBE.TXDCTL i) txdctl_magic_bits;
-            let descriptors =
-              TXD.split
-                num_tx_queue_entries
-                descriptor_ring.virt in
-            let pkt_bufs = (* maybe fill with null buffers to avoid indirections *)
-              Array.create num_tx_queue_entries Memory.dummy in
-            { descriptors;
-              clean_index = 0;
-              tx_index = 0;
-              pkt_bufs;
-            }) in
-    t.set_reg IXGBE.DMATXCTL IXGBE.DMATXCTL.te;
-    t.txqs <- txqs
-  end
+    ra.set_reg IXGBE.DTXMXSZRQ 0xFFFFl;
+    ra.clear_flags IXGBE.RTTDCS IXGBE.RTTDCS.arbdis;
+    let init_txq i =
+      debug "initializing txq %d" i;
+      let ring_size_bytes =
+        TXD.sizeof * num_tx_queue_entries in
+      let descriptor_ring =
+        Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
+      Cstruct.memset descriptor_ring.virt 0xff;
+      (* set base address *)
+      let lo, hi = split descriptor_ring.phys in
+      ra.set_reg (IXGBE.TDBAL i) lo;
+      ra.set_reg (IXGBE.TDBAH i) hi;
+      (* set ring length *)
+      ra.set_reg (IXGBE.TDLEN i) Int32.(of_int_exn ring_size_bytes);
+      debug "tx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
+      let txdctl_old =
+        ra.get_reg (IXGBE.TXDCTL i) in
+      let txdctl_magic_bits =
+        let open Int32 in
+        txdctl_old
+        land ((lnot 0x3Fl) lor (0x3Fl lsl 8) lor (0x3Fl lsl 16))
+        lor (36l lor (8l lsl 8) lor (4l lsl 16)) in
+      ra.set_reg (IXGBE.TXDCTL i) txdctl_magic_bits;
+      let descriptors =
+        TXD.split
+          num_tx_queue_entries
+          descriptor_ring.virt in
+      let pkt_bufs = (* maybe fill with null buffers to avoid indirections *)
+        Array.create num_tx_queue_entries Memory.dummy in
+      { descriptors;
+        clean_index = 0;
+        tx_index = 0;
+        pkt_bufs;
+      } in
+    let txqs = Array.init n ~f:init_txq in
+    ra.set_reg IXGBE.DMATXCTL IXGBE.DMATXCTL.te;
+    txqs
+  end else
+    [||]
 
 let start_tx t i =
   info "starting txq %d" i;
   if num_tx_queue_entries land (num_tx_queue_entries - 1) <> 0 then
     error "number of tx queue entries must be a power of 2";
-  t.set_reg (IXGBE.TDH i) 0l;
-  t.set_reg (IXGBE.TDT i) 0l;
-  t.set_flags (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable;
-  t.wait_set (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable
+  t.ra.set_reg (IXGBE.TDH i) 0l;
+  t.ra.set_reg (IXGBE.TDT i) 0l;
+  t.ra.set_flags (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable;
+  t.ra.wait_set (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable
+
+let register_access_of_hw hw =
+  { get_reg = IXGBE.get_reg hw;
+    set_reg = IXGBE.set_reg hw;
+    set_flags = IXGBE.set_flags hw;
+    clear_flags = IXGBE.clear_flags hw;
+    wait_set = IXGBE.wait_set hw;
+    wait_clear = IXGBE.wait_clear hw
+  }
 
 let create ~pci_addr ~rxq ~txq =
   if Unix.getuid () <> 0 then
@@ -257,30 +266,22 @@ let create ~pci_addr ~rxq ~txq =
   info "device %s has device id %#x" pci_addr_str device_id;
   let hw =
     PCI.map_resource pci_addr in
+  let ra = register_access_of_hw hw in
+  disable_interrupts ra;
+  reset ra;
+  disable_interrupts ra;
+  info "initializing device %s" pci_addr_str;
+  ra.wait_set IXGBE.EEC IXGBE.EEC.ard;
+  ra.wait_set IXGBE.RDRXCTL IXGBE.RDRXCTL.dmaidone;
+  init_link ra;
   let t =
-    { hw;
-      pci_addr = pci_addr_str;
+    { pci_addr = pci_addr_str;
       num_rxq = rxq;
-      rxqs = [||];
+      rxqs = init_rx ra rxq;
       num_txq = txq;
-      txqs = [||];
-      get_reg = IXGBE.get_reg hw;
-      set_reg = IXGBE.set_reg hw;
-      set_flags = IXGBE.set_flags hw;
-      clear_flags = IXGBE.clear_flags hw;
-      wait_set = IXGBE.wait_set hw;
-      wait_clear = IXGBE.wait_clear hw
+      txqs = init_tx ra txq;
+      ra
     } in
-  disable_interrupts t;
-  reset t;
-  disable_interrupts t;
-  info "initializing device %s" t.pci_addr;
-  t.wait_set IXGBE.EEC IXGBE.EEC.ard;
-  t.wait_set IXGBE.RDRXCTL IXGBE.RDRXCTL.dmaidone;
-  init_link t;
-  (* read_stats *)
-  init_rx t;
-  init_tx t;
   for i = 0 to rxq - 1 do
     start_rx t i
   done;
@@ -322,7 +323,7 @@ let rx_batch t rxq_id =
     Array.init num_done ~f:receive in
   if num_done > 0 then begin
     rxq.rx_index <- wrap_rx (rx_index + num_done - 1);
-    t.set_reg (IXGBE.RDT rxq_id) (Int32.of_int_exn rxq.rx_index)
+    t.ra.set_reg (IXGBE.RDT rxq_id) (Int32.of_int_exn rxq.rx_index)
   end;
   bufs
 
@@ -365,7 +366,7 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
     TXD.reset txq.descriptors.(wrap_tx (txq.tx_index + i)) bufs.(i)
   done;
   txq.tx_index <- txq.tx_index + n;
-  t.set_reg (IXGBE.TDT txq_id) (Int32.of_int_exn txq.tx_index);
+  t.ra.set_reg (IXGBE.TDT txq_id) (Int32.of_int_exn txq.tx_index);
   Array.sub bufs ~pos:n ~len:(Array.length bufs - n)
 
 let tx_batch_busy_wait ?clean_large t txq_id bufs =
@@ -376,7 +377,7 @@ let tx_batch_busy_wait ?clean_large t txq_id bufs =
   send bufs
 
 let check_link t =
-  let links_reg = t.get_reg IXGBE.LINKS in
+  let links_reg = t.ra.get_reg IXGBE.LINKS in
   let speed =
     match Int32.(links_reg land IXGBE.LINKS.speed_82599) with
     | speed when speed = IXGBE.SPEED._10G -> `SPEED_10G
