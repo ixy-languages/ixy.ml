@@ -375,7 +375,7 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
       if i <> cleanup_to then
         loop (wrap_tx (i + 1)) in
     loop txq.clean_index;
-    txq.clean_index <- cleanup_to in
+    txq.clean_index <- wrap_tx (cleanup_to + 1) in
   if clean_large then begin
     if check 128 then (* possibly quicker batching *)
       clean_ahead 128
@@ -392,7 +392,9 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
   let n = Int.min num_empty_descriptors (Array.length bufs) in
   for i = 0 to n - 1 do
     (* send packet *)
-    TXD.reset txq.descriptors.(wrap_tx (txq.tx_index + i)) bufs.(i)
+    let index = wrap_tx (txq.tx_index + i) in
+    TXD.reset txq.descriptors.(index) bufs.(i);
+    txq.pkt_bufs.(index) <- bufs.(i)
   done;
   txq.tx_index <- wrap_tx (txq.tx_index + n);
   debug "transmitted %d packets" n;
