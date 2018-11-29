@@ -1,10 +1,14 @@
 # Memory
 
 This document details the memory interface used by the ixy.ml driver and the Intel 82599 NIC to communicate with each other.
-This document references the [Intel® 82599 10 GbE Controller Datasheet](https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf). (TODO add references)
+This document references the [IntelÂ® 82599 10 GbE Controller Datasheet](https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf). (TODO add references)
 This document assumes a word size of 64 bit.
 
 ixy refers to the [original C implementation by Paul Emmerich](https://github.com/emmericp/ixy) while ixy.ml refers to the [OCaml reimplementation by Fabian Bonk](https://github.com/ixy-languages/ixy.ml).
+
+## Thread-safety
+
+ixy.ml is **not** thread-safe. Invariants for each queue are only guaranteed to hold between calls to `rx_burst`/`tx_burst`.
 
 ## ixy vs ixy.ml packet buffers
 
@@ -188,7 +192,7 @@ r|   |        |                            |m
 o|   | empty  |                            |e
 u|   |        |                            |n
 n|   |        |                            |t
-d|   +--------+ <- base + tail             |
+d|   +--------+ <- base + tail (rx_index)  |
  |   |        |                            |
  |   | filled |                            |
  |   |        |                            |
@@ -204,18 +208,7 @@ d|   +--------+ <- base + tail             |
 
 Like rx queues, tx queues maintain a descriptor ring.
 
-### Setup phase
-
-During tx setup the driver initializes a number of tx queues.
-Head and tail pointers are also set to 0.
-The tx setup is somewhat simpler than the rx setup, since there are no descriptors in the descriptor ring initially.
-Descriptors will be added once the user program calls `tx_batch` with a number of packet buffers.
-
-### Active phase
-
-Once the user program calls `tx_batch` the driver performs two steps: cleanup and transmit.
-
-#### Ring layout
+### Ring layout
 
 ```
  +-------+
@@ -235,7 +228,7 @@ u|   |        |                            |m
 n|   | unsent |                            |e
 d|   |        |                            |n
  |   |        |                            |t
- |   +--------+ <- base + tail             |
+ |   +--------+ <- base + tail (tx_index)  |
  |   |        |                            |
  |   | empty  |                            |
  |   |        |                            |
@@ -247,6 +240,17 @@ d|   |        |                            |n
 * Descriptors between `clean_index` and `head` are previously inserted packets that have been sent by the NIC.
 * Descriptors between `head` and `tail` point to previously inserted packets that haven't been sent by the NIC.
 * Descriptors between `tail` and `clean_index` are cleaned and ready-to-use.
+
+### Setup phase
+
+During tx setup the driver initializes a number of tx queues.
+Head and tail pointers are also set to 0.
+The tx setup is somewhat simpler than the rx setup, since there are no descriptors in the descriptor ring initially.
+Descriptors will be added once the user program calls `tx_batch` with a number of packet buffers.
+
+### Active phase
+
+Once the user program calls `tx_batch` the driver performs two steps: cleanup and transmit.
 
 #### Cleanup
 
@@ -270,3 +274,10 @@ If `tx_batch` is called with `~clean_large:true` the second strategy will be cho
 
 To transmit packets the driver just walks the descriptor ring, setting each descriptor to one of the packets that are to be transmitted, until it has sent all packets or hits a non-cleaned descriptor.
 Once that's done the tail pointer register needs to be updated; ixy then returns the number of sent packets to the caller while ixy.ml returns the unsent packets themselves.
+
+### Invariants
+
+`tx_index` points to the buffer into which the next transmitted packet will be inserted.
+`clean_index` points to the next buffer to be cleaned.
+Buffers in [`tx_index`, `clean_index`) are already cleaned and may be used.
+Buffers in [`clean_index`, `tx_index`) must be checked and possibly cleaned.
