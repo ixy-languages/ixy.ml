@@ -348,7 +348,7 @@ let rx_batch t rxq_id =
       let buf, rxd = pkt_bufs.(index), descriptors.(index) in
       Memory.pkt_buf_resize buf (RXD.size rxd);
       let new_buf = empty_bufs.(offset) in
-      RXD.reset descriptors.(index) new_buf;
+      RXD.reset rxd new_buf;
       pkt_bufs.(index) <- new_buf;
       buf in
     Array.init num_done ~f:receive in
