@@ -69,21 +69,17 @@ type pci_config = {
 ]
 
 let get_config t =
-  if Ixy_dbg.testing then
-    { vendor = 0; device_id = 0; class_code = 0; subclass = 0; prog_if = 0 }
-  else begin
-    let ic = In_channel.create (conf_path t) in
-    let cstruct =
-      let buf = Bytes.create sizeof_pci_conf_space in
-      assert (In_channel.input ic ~buf ~pos:0 ~len:sizeof_pci_conf_space = sizeof_pci_conf_space);
-      In_channel.close ic;
-      Cstruct.of_bytes buf in
-    { vendor = get_pci_conf_space_vendor_id cstruct;
-      device_id = get_pci_conf_space_device_id cstruct;
-      class_code = get_pci_conf_space_class_code cstruct;
-      subclass = get_pci_conf_space_subclass cstruct;
-      prog_if = get_pci_conf_space_prog_if cstruct
-    }
-  end
+  let ic = In_channel.create (conf_path t) in
+  let cstruct =
+    let buf = Bytes.create sizeof_pci_conf_space in
+    assert (In_channel.input ic ~buf ~pos:0 ~len:sizeof_pci_conf_space = sizeof_pci_conf_space);
+    In_channel.close ic;
+    Cstruct.of_bytes buf in
+  { vendor = get_pci_conf_space_vendor_id cstruct;
+    device_id = get_pci_conf_space_device_id cstruct;
+    class_code = get_pci_conf_space_class_code cstruct;
+    subclass = get_pci_conf_space_subclass cstruct;
+    prog_if = get_pci_conf_space_prog_if cstruct
+  }
 
 let vendor_intel = 0x8086
