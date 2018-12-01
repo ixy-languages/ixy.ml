@@ -86,7 +86,7 @@ let dummy =
     { entry_size = 0;
       num_entries = 0;
       free = 0;
-      free_bufs = [||]
+      free_bufs = [||] (* ensure out of bounds write when freed *)
     } in
   { phys = 0L;
     mempool = dummy_pool;
@@ -151,12 +151,14 @@ let pkt_buf_alloc ({ free; free_bufs; _ } as mempool) =
     None
 
 let pkt_buf_free ({ mempool = ({ free; free_bufs; _ } as mempool); _ } as buf) =
+  (* We could check for double frees with a new field in [pkt_buf] and
+   * a check here. *)
   free_bufs.(free) <- buf;
   mempool.free <- free + 1
 
-let pkt_buf_resize ({ mempool = { entry_size }; _ } as buf) ~size =
-  (* TODO we should additionally check against the MTU *)
-  if size > 0 && size <= entry_size then
+let pkt_buf_resize ({ mempool = { entry_size; _ }; _ } as buf) ~size =
+  (* MTU is fixed at 1518 by default. *)
+  if size > 0 && size <= entry_size && size <= 1518 then
     buf.size <- size
   else
     error "0 < size <= %d is not fulfilled; size = %d" entry_size size
