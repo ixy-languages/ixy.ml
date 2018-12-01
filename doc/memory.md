@@ -2,17 +2,19 @@
 
 This document details the memory interface used by the ixy.ml driver and the Intel 82599 NIC to communicate with each other.
 This document references the [Intel® 82599 10 GbE Controller Datasheet](https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf). (TODO add references)
-This document assumes a word size of 64 bit.
+This document (as well as ixy.ml itself) assumes a word size of 64 bit.
 
 ixy refers to the [original C implementation by Paul Emmerich](https://github.com/emmericp/ixy) while ixy.ml refers to the [OCaml reimplementation by Fabian Bonk](https://github.com/ixy-languages/ixy.ml).
 
 ## Thread-safety
 
-ixy.ml is **not** thread-safe. Invariants for each queue are only guaranteed to hold between calls to `rx_burst`/`tx_burst`.
+ixy.ml is **not** thread-safe.
+Invariants for each queue are only guaranteed to hold between calls to `rx_burst`/`tx_burst`.
+Memory pools are not locked during operation; multiple threads must not allocate/free buffers in the same pool at the same time.
 
 ## ixy vs ixy.ml packet buffers
 
-By default ixy allocates `(NUM_RX_QUEUE_ENTRIES + NUM_TX_QUEUE_ENTRIES) * 2048 = 16 MiB` per mempool.
+By default ixy allocates `4096 * 2 KiB = 16 MiB` for each rx queue's mempool.
 This memory is not physically contiguous, as it doesn't fit into the 2 MiB huge pages used by ixy.
 Theoretically each mempool should consume exactly 8 huge pages.
 Back-to-back within this memory there are packet buffers:
@@ -178,7 +180,7 @@ d|   +--------+ <- base + tail (rx_index)  |
 
 During rx setup the driver initializes a number of rx queues.
 Each queue maintains its own mempool as well as its own descriptor ring.
-The descriptor ring gets filled with empty packet buffers.
+The descriptor ring is filled with empty packet buffers.
 Head and tail pointers are set to the same value; in our case `0`.
 The queues additionally need to maintain a mapping from descriptor ring index to packet buffer since the rx descriptor itself only contains the physical address of the packet buffer and this physical address gets overwritten by the NIC during the write-back phase.
 ixy uses the `virtual_addresses` array in its queue while ixy.ml calls this array `pkt_bufs`.
@@ -203,7 +205,7 @@ Now the packet is done and its spot in the descriptor ring needs to be filled wi
 Now we just need to update the tail pointer to tell the hardware up to which point there are empty buffers in the ring.
 We only update the tail pointer once to prevent unnecessary overhead from repeated PCIe transactions.
 
-Note that ixy employs a slightly different rx strategy: ixy scans each descriptor and immediately receives it, if its `DD` bit is set, while ixy.ml walks the entire ring until it hits an empty descriptor.
+Note that ixy employs a slightly different rx strategy: ixy scans each descriptor and immediately receives its corresponding packet, if its `DD` bit is set, while ixy.ml walks the entire ring until it hits an empty descriptor and then receives all previous descriptors' packets at once.
 
 Both ixy and ixy.ml additionally check a descriptors `EOP` (end of packet) bit before receiving.
 If this bit is not set, the packet did not fit into the 2 KiB packet buffer and had to be split up.
@@ -261,7 +263,7 @@ Once the user program calls `tx_batch` the driver performs two steps: cleanup an
 #### Cleanup
 
 Before inserting the outgoing packets into the descriptor ring, the driver needs to clean previously sent descriptors.
-To improve performance, cleanup has to be done in batches of 32 descriptors.
+To improve performance, cleanup is done in batches of 32 descriptors.
 
 For performance reasons we can't actually read the head pointer; reading NIC registers requires a full PCIe transaction.
 The buffers that may be ready to be cleaned are the ones between `clean_index` and the tail pointer; of these the ones that have their `DD` bit set are ready to be cleaned.
