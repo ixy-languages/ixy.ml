@@ -136,7 +136,7 @@ A descriptor ring is a circular buffer with a head and a tail pointer.
 The driver controls the tail pointer; the NIC controls the head pointer.
 The descriptor ring is contiguous in memory.
 It starts at a base address; head and tail are offsets from the base address.
-Both ixy and ixy.ml only support rings whose descriptor capacity is a power of two: With this ring size, wrapping around the ring's end can be done without costly modulo operations (`next_index <- (current_index + 1) & (ring_size - 1)`, see `wrap_ring` in [`lib/ixy.ml`](../lib/ixy.ml)).
+Both ixy and ixy.ml only support rings whose descriptor capacity is a power of two: With this ring size, wrapping around the ring's end can be done without costly modulo operations (`next_index <- (current_index + 1) & (ring_size - 1)`, see `wrap_rx` and `wrap_tx` in [`lib/ixy.ml`](../lib/ixy.ml)).
 The tail pointer always points to the first invalid descriptor.
 See 7.1.9.
 
