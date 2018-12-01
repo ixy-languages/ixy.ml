@@ -151,7 +151,7 @@ let init_rx ra n =
     for i = 0 to n - 1 do
       ra.clear_flags (IXGBE.DCA_RXCTRL i) Int32.(1l lsl 12)
     done;
-    ra.set_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen; (* warum hier? *)
+    ra.set_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen;
     rxqs
   end else
     [||]
@@ -324,11 +324,11 @@ let create ~pci_addr ~rxq ~txq =
 let rx_batch t rxq_id =
   let wrap_rx index =
     index land (num_rx_queue_entries - 1) in
-  let { descriptors; rx_index; pkt_bufs; mempool } as rxq =
+  let { descriptors; pkt_bufs; mempool; _ } as rxq =
     t.rxqs.(rxq_id) in
   let num_done =
     let rec loop offset =
-      let rxd = descriptors.(wrap_rx (rx_index + offset)) in
+      let rxd = descriptors.(wrap_rx (rxq.rx_index + offset)) in
       if RXD.dd rxd then
         if not (RXD.eop rxd) then
           error "jumbo frames are not supported"
@@ -343,7 +343,7 @@ let rx_batch t rxq_id =
     if Array.length empty_bufs <> num_done then
       error "could not allocate enough buffers";
     let receive offset =
-      let index = wrap_rx (rx_index + offset) in
+      let index = wrap_rx (rxq.rx_index + offset) in
       debug "receiving at index %d" index;
       let buf, rxd = pkt_bufs.(index), descriptors.(index) in
       Memory.pkt_buf_resize buf (RXD.size rxd);
@@ -353,7 +353,7 @@ let rx_batch t rxq_id =
       buf in
     Array.init num_done ~f:receive in
   if num_done > 0 then begin
-    rxq.rx_index <- wrap_rx (rx_index + num_done);
+    rxq.rx_index <- wrap_rx (rxq.rx_index + num_done);
     t.ra.set_reg (IXGBE.RDT rxq_id) (Int32.of_int_exn (wrap_rx (rxq.rx_index - 1)))
   end;
   bufs
@@ -361,17 +361,17 @@ let rx_batch t rxq_id =
 let tx_batch ?(clean_large = false) t txq_id bufs =
   let wrap_tx index =
     index land (num_tx_queue_entries - 1) in
-  let txq = t.txqs.(txq_id) in
+  let { descriptors; pkt_bufs; _ } as txq = t.txqs.(txq_id) in
   (* returns wether or not the descriptor at clean_index + offset can be cleaned *)
   let check offset =
     let cleanable = wrap_tx (txq.tx_index - txq.clean_index) in
-    cleanable >= offset && TXD.dd txq.descriptors.(wrap_tx (txq.clean_index + offset - 1)) in
+    cleanable >= offset && TXD.dd descriptors.(wrap_tx (txq.clean_index + offset - 1)) in
   let clean_ahead offset =
     (* cleanup_to points to the first descriptor we won't clean *)
     let cleanup_to =
       wrap_tx (txq.clean_index + offset - 1) in
     let rec loop i =
-      Memory.pkt_buf_free txq.pkt_bufs.(i);
+      Memory.pkt_buf_free pkt_bufs.(i);
       if i <> cleanup_to then
         loop (wrap_tx (i + 1)) in
     loop txq.clean_index;
@@ -387,14 +387,14 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
     while check tx_clean_batch do (* default ixy behavior *)
       clean_ahead tx_clean_batch
     done;
-  let num_empty_descriptors = (* TODO check this calculation *)
+  let num_empty_descriptors =
     wrap_tx (txq.clean_index - txq.tx_index) in
   let n = Int.min num_empty_descriptors (Array.length bufs) in
   for i = 0 to n - 1 do
     (* send packet *)
     let index = wrap_tx (txq.tx_index + i) in
-    TXD.reset txq.descriptors.(index) bufs.(i);
-    txq.pkt_bufs.(index) <- bufs.(i)
+    TXD.reset descriptors.(index) bufs.(i);
+    pkt_bufs.(index) <- bufs.(i)
   done;
   txq.tx_index <- wrap_tx (txq.tx_index + n);
   debug "transmitted %d packets" n;
