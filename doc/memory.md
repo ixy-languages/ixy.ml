@@ -102,10 +102,9 @@ When the NIC receives a packet it writes the packet to the address specified in 
 
 After receiving a packet the NIC updates the rx descriptor to notify the driver.
 It uses the write-back format.
-The relevant bit for the driver is the LSB of the second word, the Descriptor Done (DD) bit.
+The relevant bit for the driver is the LSB of the second word, the Descriptor Done (`DD`) bit.
 Once this bit is set the driver has written a packet to the buffer.
-Additionally ixy and ixy.ml check if the End Of Packet (EOP) bit is set.
-If this bit is not set the NIC had to split the packet up into multiple buffers which is currently not support by the driver.
+Additionally ixy and ixy.ml check if the End Of Packet (`EOP`) bit is set.
 
 Bits 32 through 47 of the second word of the write-back format indicate the received packet's length in bytes.
 
@@ -126,7 +125,7 @@ See [`lib/tXD.ml`](../lib/tXD.ml).
 ### Write-back Format
 
 The write-back format consists almost entirely of reserved bits (according to the datasheet).
-The only actual flag is the DD flag.
+The only actual flag is the `DD` flag.
 Once this flag has been set, the NIC has transmitted the packet stored in the corresponding packet buffer.
 The packet buffer is then ready to be cleaned.
 
@@ -142,35 +141,6 @@ The tail pointer always points to the first invalid descriptor.
 See 7.1.9.
 
 ## Receive flow
-
-### Setup phase
-
-During rx setup the driver initializes a number of rx queues.
-Each queue maintains its own mempool as well as its own descriptor ring.
-The descriptor ring gets filled with empty packet buffers.
-Head and tail pointers are set to the same value; in our case 0.
-The queues additionally need to maintain a mapping from descriptor ring index to packet buffer since the rx descriptor itself only contains a physical address of the packet buffer and this physical address gets overwritten by the NIC during the write-back phase.
-ixy uses the `virtual_addresses` array in its queue while ixy.ml uses `pkt_bufs`.
-
-### Active phase
-
-After everything has been set up, control flow returns to the user program.
-The user program periodically calls `rx_batch` to receive a batch of packets.
-
-`rx_batch` walks the descriptor ring and checks every descriptor's DD bit.
-If this bit is set, we know that the NIC has placed a packet in the buffer the descriptor points to.
-Once we have reached a descriptor whose DD bit isn't set, we have reached the first empty descriptor, i.e. the head.
-
-Now we can receive all packets between tail and head.
-To prepare the packet for the user program we need to set its size.
-The NIC stored the packet's size in the size field of the descriptor.
-After fetching the size, the packet buffer's `size` field is updated.
-Now the packet is done and its spot in the descriptor ring needs to be filled with a new empty packet buffer.
-
-Now we just need to update the tail pointer to tell the hardware up to which point there are empty buffers in the ring.
-We only update the tail pointer once to prevent unnecessary overhead from repeated PCIe transactions.
-
-Note that ixy employs a slightly different rx strategy: ixy scans each descriptor and immediately receives it, if its DD bit is set, while ixy.ml walks the entire ring until it hits an empty descriptor.
 
 ### Ring layout
 
@@ -203,6 +173,42 @@ d|   +--------+ <- base + tail (rx_index)  |
 
 * Descriptors between `head` and `tail` point to empty `pkt_buf`s waiting to be written to by the NIC.
 * Descriptors between `tail` and `head` point to filled `pkt_buf`s that are ready to be received by the driver.
+
+### Setup phase
+
+During rx setup the driver initializes a number of rx queues.
+Each queue maintains its own mempool as well as its own descriptor ring.
+The descriptor ring gets filled with empty packet buffers.
+Head and tail pointers are set to the same value; in our case `0`.
+The queues additionally need to maintain a mapping from descriptor ring index to packet buffer since the rx descriptor itself only contains the physical address of the packet buffer and this physical address gets overwritten by the NIC during the write-back phase.
+ixy uses the `virtual_addresses` array in its queue while ixy.ml calls this array `pkt_bufs`.
+
+`pkt_bufs.(i)` contains the `pkt_buf` described by the rx descriptor in `descriptors.(i)`.
+
+### Active phase
+
+After everything has been set up, control flow returns to the user program.
+The user program periodically calls `rx_batch` to receive a batch of packets.
+
+`rx_batch` walks the descriptor ring and checks every descriptor's `DD` bit.
+If this bit is set, we know that the NIC has placed a packet in the buffer the descriptor points to.
+Once we have reached a descriptor whose `DD` bit isn't set, we have reached the first empty descriptor, i.e. the head.
+
+Now we can receive all packets between tail and head.
+To prepare the packet for the user program we need to set its size.
+The NIC stored the packet's size in the size field of the descriptor.
+After fetching the size, the packet buffer's `size` field is updated.
+Now the packet is done and its spot in the descriptor ring needs to be filled with a new empty packet buffer.
+
+Now we just need to update the tail pointer to tell the hardware up to which point there are empty buffers in the ring.
+We only update the tail pointer once to prevent unnecessary overhead from repeated PCIe transactions.
+
+Note that ixy employs a slightly different rx strategy: ixy scans each descriptor and immediately receives it, if its `DD` bit is set, while ixy.ml walks the entire ring until it hits an empty descriptor.
+
+Both ixy and ixy.ml additionally check a descriptors `EOP` (end of packet) bit before receiving.
+If this bit is not set, the packet did not fit into the 2 KiB packet buffer and had to be split up.
+Currently neither ixy nor ixy.ml support jumbo frames.
+This check is not strictly necessary, since the 82599's default `MAXFRS` (max frame size) is 1518 (Ethernet default) and `JUMBOEN` (enable jumbo frames) is disabled by default.
 
 ## Transmit flow
 
@@ -244,7 +250,7 @@ d|   |        |                            |n
 ### Setup phase
 
 During tx setup the driver initializes a number of tx queues.
-Head and tail pointers are also set to 0.
+Head and tail pointers are also set to `0`.
 The tx setup is somewhat simpler than the rx setup, since there are no descriptors in the descriptor ring initially.
 Descriptors will be added once the user program calls `tx_batch` with a number of packet buffers.
 
@@ -258,15 +264,15 @@ Before inserting the outgoing packets into the descriptor ring, the driver needs
 To improve performance, cleanup has to be done in batches of 32 descriptors.
 
 For performance reasons we can't actually read the head pointer; reading NIC registers requires a full PCIe transaction.
-The buffers that may be ready to be cleaned are the ones between `clean_index` and the tail pointer; of these the ones that have their DD bit set are ready to be cleaned.
-However, it is inefficient to check every descriptor's DD bit.
-Therefore ixy checks the descriptor 32 ahead of `clean_index`; if this descriptor's DD bit is set, all the buffers that were skipped can also be cleaned.
-After cleaning these buffers, `clean_index` can be incremented by 32 and the whole process can be repeated until a buffer, whose DD bit isn't set, is hit.
+The buffers that may be ready to be cleaned are the ones between `clean_index` and the tail pointer; of these the ones that have their `DD` bit set are ready to be cleaned.
+However, it is inefficient to check every descriptor's `DD` bit.
+Therefore ixy checks the descriptor 32 ahead of `clean_index`; if this descriptor's `DD` bit is set, all the buffers that were skipped can also be cleaned.
+After cleaning these buffers, `clean_index` can be incremented by 32 and the whole process can be repeated until a buffer, whose `DD` bit isn't set, is hit.
 
-In addition to ixy's behavior, ixy.ml supports another cleanup strategy; this behavior can be switched on and off when calling `tx_batch`:
+In addition to ixy's behavior, ixy.ml supports another cleanup strategy; this behavior can be switched on or off when calling `tx_batch`:
 Optionally ixy.ml checks the descriptor 128 ahead of `clean_index`.
-If this descriptor's DD bit is set, all 128 buffers can be cleaned at once and cleaning is done; remaining buffers will be cleaned upon the next call to `tx_batch`.
-If the DD bit is not set the same procedure will be repeated for offsets of 64 and 32.
+If this descriptor's `DD` bit is set, all 128 buffers can be cleaned at once and cleaning is done; remaining buffers will be cleaned upon the next call to `tx_batch`.
+If the `DD` bit is not set, the same procedure will be repeated for offsets 64 and 32.
 This favors large collections at once, thereby reducing the amount of memory reads and increasing the amount of descriptors cleaned in a single pass.
 If `tx_batch` is called with `~clean_large:true` the second strategy will be chosen, otherwise ixy's behavior will be replicated.
 
@@ -279,5 +285,9 @@ Once that's done the tail pointer register needs to be updated; ixy then returns
 
 `tx_index` points to the buffer into which the next transmitted packet will be inserted.
 `clean_index` points to the next buffer to be cleaned.
-Buffers in [`tx_index`, `clean_index`) are already cleaned and may be used.
-Buffers in [`clean_index`, `tx_index`) must be checked and possibly cleaned.
+Buffers in `[tx_index, clean_index)` are already cleaned and may be used.
+Buffers in `[clean_index, tx_index)` must be checked and possibly cleaned.
+
+After at least `num_tx_queue_entries` packets have been sent, `pkt_bufs.(i)` contains the `pkt_buf` described by the tx descriptor in `descriptors.(i)`.
+Before that `pkt_bufs` will be filled with dummy buffers (that **must not be freed**) and `descriptors` will be filled with descriptors pointing to `0xffffffffffffffff`.
+`0xffffffffffffffff` is used instead of `0` to cause rogue writes to trigger a DMA error instead of actually writing to physical memory (see [Snabb's implementation](https://github.com/snabbco/snabb/blob/master/src/apps/intel/intel10g.lua#L169))
