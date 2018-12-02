@@ -92,7 +92,7 @@ let init_link ra =
   let autoc = ra.get_reg IXGBE.AUTOC in
   ra.set_reg
     IXGBE.AUTOC
-    Int32.(autoc land (lnot IXGBE.AUTOC._10G_pma_pmd_mask));
+    Int32.((autoc land (lnot IXGBE.AUTOC._10G_pma_pmd_mask)) lor IXGBE.AUTOC._10G_xaui);
   ra.set_flags IXGBE.AUTOC IXGBE.AUTOC.an_restart
 
 let init_rx ra n =
@@ -222,7 +222,7 @@ let init_tx ra n =
         Array.create num_tx_queue_entries Memory.dummy in
       { descriptors;
         clean_index = 0;
-        tx_index = 0;
+        tx_index = 1;
         pkt_bufs;
       } in
     let txqs = Array.init n ~f:init_txq in
@@ -235,8 +235,8 @@ let start_tx t i =
   info "starting txq %d" i;
   if num_tx_queue_entries land (num_tx_queue_entries - 1) <> 0 then
     error "number of tx queue entries must be a power of 2";
-  t.ra.set_reg (IXGBE.TDH i) 0l;
-  t.ra.set_reg (IXGBE.TDT i) 0l;
+  t.ra.set_reg (IXGBE.TDH i) 1l;
+  t.ra.set_reg (IXGBE.TDT i) 1l;
   t.ra.set_flags (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable;
   t.ra.wait_set (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable
 

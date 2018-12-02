@@ -34,16 +34,6 @@ module CTRL : sig
   val ctrl_rst_mask : t
 end
 
-module MACC : sig
-  type t = int32
-
-  val flu : t
-
-  val fsv : t
-
-  val fs : t
-end
-
 module EEC : sig
   type t = int32
 
@@ -66,6 +56,8 @@ module AUTOC : sig
   val lms_10G_serial : t
 
   val _10G_pma_pmd_mask : t
+
+  val _10G_xaui : t
 
   val an_restart : t
 end

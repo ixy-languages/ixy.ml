@@ -36,16 +36,6 @@ module CTRL = struct
   let ctrl_rst_mask = Int32.(lnk_rst lor rst)
 end
 
-module MACC = struct
-  type t = int32
-
-  let flu = 0x00000001l
-
-  let fsv = 0x00030000l
-
-  let fs = 0x00040000l
-end
-
 module EEC = struct
   type t = int32
 
@@ -70,6 +60,10 @@ module AUTOC = struct
   let lms_10G_serial = Int32.(0x3l lsl lms_shift)
 
   let _10G_pma_pmd_mask = 0x00000180l
+
+  let _10G_pma_pmd_shift = 7
+
+  let _10G_xaui = Int32.(0x0l lsl _10G_pma_pmd_shift)
 
   let an_restart = 0x00001000l
 end
