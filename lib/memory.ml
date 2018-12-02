@@ -158,7 +158,8 @@ let pkt_buf_free ({ mempool = ({ free; free_bufs; _ } as mempool); _ } as buf) =
 
 let pkt_buf_resize ({ mempool = { entry_size; _ }; _ } as buf) ~size =
   (* MTU is fixed at 1518 by default. *)
-  if size > 0 && size <= entry_size && size <= 1518 then
+  let upper = Int.min entry_size IXGBE.default_mtu in
+  if size > 0 && size <= upper then
     buf.size <- size
   else
-    error "0 < size <= %d is not fulfilled; size = %d" entry_size size
+    error "0 < size <= %d is not fulfilled; size = %d" upper size

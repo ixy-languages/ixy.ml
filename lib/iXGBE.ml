@@ -1,5 +1,7 @@
 open Core
 
+let default_mtu = 1518
+
 module EIMC = struct
   type t = int32
 

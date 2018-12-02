@@ -1,3 +1,5 @@
+val default_mtu : int
+
 module EIMC : sig
   type t = int32
 
