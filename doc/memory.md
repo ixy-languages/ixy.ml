@@ -290,6 +290,9 @@ Once that's done the tail pointer register needs to be updated; ixy then returns
 Buffers in `[tx_index, clean_index)` are already cleaned and may be used.
 Buffers in `[clean_index, tx_index)` must be checked and possibly cleaned.
 
+`tx_index` is always "ahead" of `clean_index`.
+Only before the first packet has been transmitted will `tx_index` and `clean_index` be equal, though no cleaning will be done until at least 32 packets have been transmitted.
+
 After at least `num_tx_queue_entries` packets have been sent, `pkt_bufs.(i)` contains the `pkt_buf` described by the tx descriptor in `descriptors.(i)`.
 Before that `pkt_bufs` will be filled with dummy buffers (that **must not be freed**) and `descriptors` will be filled with descriptors pointing to `0xffffffffffffffff`.
-`0xffffffffffffffff` is used instead of `0` to cause rogue writes to trigger a DMA error instead of actually writing to physical memory (see [Snabb's implementation](https://github.com/snabbco/snabb/blob/master/src/apps/intel/intel10g.lua#L169))
+`0xffffffffffffffff` is used instead of `0` to cause rogue writes to trigger a DMA error instead of actually writing to physical memory (see [Snabb's implementation](https://github.com/snabbco/snabb/blob/master/src/apps/intel/intel10g.lua#L169)).
