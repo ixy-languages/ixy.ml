@@ -36,17 +36,18 @@ let batch_size = 64
   } [@@big_endian]
 ]
 
+let calc_ip_checksum ipv4 =
+  let sum =
+    let rec loop i acc =
+      if i < sizeof_ipv4 / 2 then
+        loop (i + 1) (acc + Cstruct.BE.get_uint16 ipv4 (2 * i))
+      else
+        acc in
+    loop 0 0 in
+  let carry = (sum land 0xf0000) lsr 16 in
+  (lnot (sum + carry)) land 0xffff
+
 let pkt_data =
-  let calc_ip_checksum buf =
-    let ipv4 = Cstruct.sub buf sizeof_ethernet sizeof_ipv4 in
-    let iter =
-      Cstruct.iter
-        (fun cs -> if Cstruct.len cs > 0 then Some 2 else None)
-        (fun cs -> Cstruct.BE.get_uint16 cs 0)
-        ipv4 in
-    let sum = Cstruct.fold ( + ) iter 0 in
-    let carry = (sum land 0xf0000) lsr 16 in
-    (lnot ((sum land 0xffff) + carry)) land 0xffff in
   let buf = Cstruct.create packet_size in
   set_ethernet_dst "\x01\x02\x03\x04\x05\x06" 0 buf;
   set_ethernet_src "\x11\x12\x13\x14\x15\x16" 0 buf;
@@ -59,17 +60,17 @@ let pkt_data =
   set_ipv4_off ipv4 0x00;
   set_ipv4_ttl ipv4 64;
   set_ipv4_proto ipv4 0x11;
-  (* Cstruct.create zero-fills the buffer; no need to clear csum *)
-  set_ipv4_src "\x0a\x00\x00\x01" 0 buf;
-  set_ipv4_dst "\x0a\x00\x00\x02" 0 buf;
-  set_ipv4_csum ipv4 (calc_ip_checksum buf);
+  (* Cstruct.create zero-fills the buffer; no need to clear csum. *)
+  set_ipv4_src "\x0a\x00\x00\x01" 0 ipv4;
+  set_ipv4_dst "\x0a\x00\x00\x02" 0 ipv4;
+  set_ipv4_csum ipv4 (calc_ip_checksum ipv4);
   let udp = Cstruct.shift ipv4 sizeof_ipv4 in
   set_udp_src udp 42;
   set_udp_dst udp 1337;
   set_udp_len udp (packet_size - sizeof_ethernet - sizeof_ipv4);
-  set_udp_csum udp 0;
+  (* Again no need to clear csum. *)
   let payload = Cstruct.shift udp sizeof_udp in
-  Cstruct.blit_from_string "ixy" 0 payload 0 3;
+  Cstruct.blit_from_string "ixy.ml" 0 payload 0 6;
   buf (* rest of the payload is zero-filled *)
 
 let usage () =
@@ -96,6 +97,5 @@ let () =
       ~f:(fun Ixy.Memory.{ data; _ } ->
           Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
           Int32.incr seq_num);
-    Ixy.tx_batch_busy_wait ~clean_large:false dev 0 bufs;
-    Ixy.Log.debug "transmitted batch"
+    Ixy.tx_batch_busy_wait ~clean_large:false dev 0 bufs
   done
