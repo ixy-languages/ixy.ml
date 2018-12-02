@@ -437,7 +437,8 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
     pkt_bufs.(index) <- bufs.(i)
   done;
   txq.tx_index <- wrap_tx (txq.tx_index + n);
-  debug "transmitted %d packets" n;
+  if n > 0 then
+    debug "transmitted %d packets" n;
   t.ra.set_reg (IXGBE.TDT txq_id) (Int32.of_int_exn txq.tx_index);
   Array.sub bufs ~pos:n ~len:(Array.length bufs - n)
 
