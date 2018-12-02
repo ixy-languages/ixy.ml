@@ -260,18 +260,18 @@ let wait_for_link t =
   let max_wait = 10. in
   let poll_interval = 0.01 in
   let rec loop rem =
-    let speed, _ = check_link t in
-    match speed with
-    | `SPEED_UNKNOWN ->
+    match check_link t with
+    | _, false
+    | `SPEED_UNKNOWN, _ ->
       if rem > 0. then begin
         ignore @@ Unix.nanosleep poll_interval;
         loop (rem -. poll_interval)
       end
-    | `SPEED_10G ->
+    | `SPEED_10G, true ->
       info "Link speed is 10 Gbit/s"
-    | `SPEED_1G ->
+    | `SPEED_1G, true ->
       info "Link speed is 1 Gbit/s"
-    | `SPEED_100 ->
+    | `SPEED_100, true ->
       info "Link speed is 100 Mbit/s" in
   loop max_wait
 
