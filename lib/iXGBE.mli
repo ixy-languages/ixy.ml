@@ -157,7 +157,6 @@ end
 (* FIXME reorder registers to allow sorting by offset range *)
 type register =
   | LINKS (* link status *)
-  | MACC (* used in the linux ixgbe driver *)
   | EIMC (* extended interrupt mask clear *)
   | CTRL (* device control *)
   | CTRL_EXT (* extended device control *)

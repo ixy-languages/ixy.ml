@@ -173,7 +173,6 @@ end
 
 type register =
   | LINKS (* link status *)
-  | MACC (* used in the linux ixgbe driver *)
   | EIMC (* extended interrupt mask clear *)
   | CTRL (* device control *)
   | CTRL_EXT (* extended device control *)
@@ -213,7 +212,6 @@ type register =
 let register_to_int register =
   match register with
   | LINKS -> 0x042A4
-  | MACC -> 0x04330
   | EIMC -> 0x00888
   | CTRL -> 0x00000
   | CTRL_EXT -> 0x00018
@@ -289,7 +287,6 @@ let register_to_int register =
 let register_to_string register =
   match register with
   | LINKS -> "LINKS"
-  | MACC -> "MACC"
   | EIMC -> "EIMC"
   | CTRL -> "CTRL"
   | CTRL_EXT -> "CTRL_EXT"
