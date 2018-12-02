@@ -3,10 +3,7 @@ open Core
 type t = string
 
 let of_string str =
-  if Scanf.sscanf str "%4x:%2x:%2x.%1x" (sprintf "%04x:%02x:%02x.%1x") <> str then
-    None
-  else
-    Some str
+  PCI_addr.check str
 
 let to_string t = t
 

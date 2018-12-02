@@ -1,5 +1,7 @@
 (jbuild_version 1)
 
+(ocamllex (pCI_addr))
+
 (library 
  ((name ixy)
   (public_name ixy)

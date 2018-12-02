@@ -1,7 +1,7 @@
 JBUILDER=jbuilder build
 JBUILDERFLAGS=-j 4
 
-TEST=check_nic uname pci_config blink
+TEST=check_nic uname pci_config blink parse_pci_addr
 APPS=echo fwd pktgen
 
 all: ${TEST} ${APPS}

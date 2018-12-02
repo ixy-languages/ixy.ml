@@ -27,3 +27,10 @@
   (modes (native))
   (libraries (ixy))
   (modules (blink))))
+
+(executable
+ ((name parse_pci_addr)
+  (public_name parse_pci_addr)
+  (modes (native))
+  (libraries (ixy))
+  (modules (parse_pci_addr))))
