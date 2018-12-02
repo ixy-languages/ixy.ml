@@ -51,7 +51,7 @@ let pkt_data =
   let buf = Cstruct.create packet_size in
   set_ethernet_dst "\x01\x02\x03\x04\x05\x06" 0 buf;
   set_ethernet_src "\x11\x12\x13\x14\x15\x16" 0 buf;
-  set_ethernet_ethertype buf 0x8000;
+  set_ethernet_ethertype buf 0x0800;
   let ipv4 = Cstruct.shift buf sizeof_ethernet in
   set_ipv4_version_ihl ipv4 0x45;
   set_ipv4_tos ipv4 0x00;
