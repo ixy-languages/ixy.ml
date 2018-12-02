@@ -222,7 +222,7 @@ let init_tx ra n =
         Array.create num_tx_queue_entries Memory.dummy in
       { descriptors;
         clean_index = 0;
-        tx_index = 1;
+        tx_index = 0;
         pkt_bufs;
       } in
     let txqs = Array.init n ~f:init_txq in
@@ -235,8 +235,8 @@ let start_tx t i =
   info "starting txq %d" i;
   if num_tx_queue_entries land (num_tx_queue_entries - 1) <> 0 then
     error "number of tx queue entries must be a power of 2";
-  t.ra.set_reg (IXGBE.TDH i) 1l;
-  t.ra.set_reg (IXGBE.TDT i) 1l;
+  t.ra.set_reg (IXGBE.TDH i) 0l;
+  t.ra.set_reg (IXGBE.TDT i) 0l;
   t.ra.set_flags (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable;
   t.ra.wait_set (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable
 
@@ -428,7 +428,10 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
       clean_ahead tx_clean_batch
     done;
   let num_empty_descriptors =
-    wrap_tx (txq.clean_index - txq.tx_index) in
+    if txq.clean_index = txq.tx_index then
+      num_tx_queue_entries
+    else
+      wrap_tx (txq.clean_index - txq.tx_index) in
   let n = Int.min num_empty_descriptors (Array.length bufs) in
   for i = 0 to n - 1 do
     (* send packet *)
