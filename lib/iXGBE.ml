@@ -318,9 +318,12 @@ let register_to_string register =
   | GOTCH -> "GOTCH"
 
 let get_reg hw register =
-  Cstruct.LE.get_uint32 hw (register_to_int register)
+  let data = Cstruct.LE.get_uint32 hw (register_to_int register) in
+  Log.debug "%s = %lx" (register_to_string register) data;
+  data
 
 let set_reg hw register data =
+  Log.debug "%s := %lx" (register_to_string register) data;
   Cstruct.LE.set_uint32 hw (register_to_int register) data
 
 let set_flags hw register flags =
