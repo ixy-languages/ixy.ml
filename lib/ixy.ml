@@ -384,7 +384,6 @@ let rx_batch t rxq_id =
       error "could not allocate enough buffers";
     let receive offset =
       let index = wrap_rx (rxq.rx_index + offset) in
-      debug "receiving at index %d" index;
       let buf, rxd = pkt_bufs.(index), descriptors.(index) in
       Memory.pkt_buf_resize buf (RXD.size rxd);
       let new_buf = empty_bufs.(offset) in
@@ -440,8 +439,6 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
     pkt_bufs.(index) <- bufs.(i)
   done;
   txq.tx_index <- wrap_tx (txq.tx_index + n);
-  if n > 0 then
-    debug "transmitted %d packets" n;
   t.ra.set_reg (IXGBE.TDT txq_id) (Int32.of_int_exn txq.tx_index);
   Array.sub bufs ~pos:n ~len:(Array.length bufs - n)
 
