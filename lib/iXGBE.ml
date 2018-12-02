@@ -203,6 +203,12 @@ type register =
   | TXDCTL of int (* transmit descriptor control *)
   | DMATXCTL (* DMA tx control *)
   | LEDCTL (* LED control *)
+  | GPRC (* Good Packets Received Count *)
+  | GPTC (* Good Packets Transmitted Count *)
+  | GORCL (* Good Octets Received Count Low *)
+  | GORCH (* Good Octets Received Count High *)
+  | GOTCL (* Good Octets Transmitted Count Low *)
+  | GOTCH (* Good Octets Transmitted Count High *)
 
 let register_to_int register =
   match register with
@@ -273,6 +279,12 @@ let register_to_int register =
   | TXDCTL i -> 0x06028 + (i * 0x40)
   | DMATXCTL -> 0x04A80
   | LEDCTL -> 0x00200
+  | GPRC -> 0x04074
+  | GPTC -> 0x04080
+  | GORCL -> 0x04088
+  | GORCH -> 0x0408C
+  | GOTCL -> 0x04090
+  | GOTCH -> 0x04094
 
 let register_to_string register =
   match register with
@@ -307,6 +319,12 @@ let register_to_string register =
   | TXDCTL i -> sprintf "TXDCTL[%d]" i
   | DMATXCTL -> "DMATXCTL"
   | LEDCTL -> "LEDCTL"
+  | GPRC -> "GPRC"
+  | GPTC -> "GPTC"
+  | GORCL -> "GORCL"
+  | GORCH -> "GORCH"
+  | GOTCL -> "GOTCL"
+  | GOTCH -> "GOTCH"
 
 let get_reg hw register =
   Cstruct.LE.get_uint32 hw (register_to_int register)

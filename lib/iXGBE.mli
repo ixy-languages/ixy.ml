@@ -187,6 +187,12 @@ type register =
   | TXDCTL of int (* transmit descriptor control *)
   | DMATXCTL (* DMA tx control *)
   | LEDCTL (* LED control *)
+  | GPRC (* Good Packets Received Count *)
+  | GPTC (* Good Packets Transmitted Count *)
+  | GORCL (* Good Octets Received Count Low *)
+  | GORCH (* Good Octets Received Count High *)
+  | GOTCL (* Good Octets Transmitted Count Low *)
+  | GOTCH (* Good Octets Transmitted Count High *)
 
 val get_reg : PCI.hw -> register -> int32
 

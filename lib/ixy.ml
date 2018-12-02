@@ -45,13 +45,24 @@ type register_access = {
   wait_clear : IXGBE.register -> int32 -> unit
 }
 
+type stats = {
+  rx_pkts : int;
+  tx_pkts : int;
+  rx_bytes : int;
+  tx_bytes : int
+}
+
 type t = {
   pci_addr : string;
   num_rxq : int;
   rxqs : rxq array;
   num_txq : int;
   txqs : txq array;
-  ra : register_access
+  ra : register_access;
+  mutable rx_pkts : int;
+  mutable tx_pkts : int;
+  mutable rx_bytes : int;
+  mutable tx_bytes : int
 }
 
 let () =
@@ -229,17 +240,10 @@ let start_tx t i =
   t.ra.set_flags (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable;
   t.ra.wait_set (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable
 
-let register_access_of_hw hw =
-  { get_reg = IXGBE.get_reg hw;
-    set_reg = IXGBE.set_reg hw;
-    set_flags = IXGBE.set_flags hw;
-    clear_flags = IXGBE.clear_flags hw;
-    wait_set = IXGBE.wait_set hw;
-    wait_clear = IXGBE.wait_clear hw
-  }
-
-let set_promisc ra =
-  ra.set_flags IXGBE.FCTRL IXGBE.FCTRL.pe
+let set_promisc t on =
+  (if on then t.ra.set_flags else t.ra.clear_flags)
+    IXGBE.FCTRL
+    IXGBE.FCTRL.pe
 
 let check_link t =
   let links_reg = t.ra.get_reg IXGBE.LINKS in
@@ -271,6 +275,30 @@ let wait_for_link t =
       info "Link speed is 100 Mbit/s" in
   loop max_wait
 
+let get_stats t =
+  t.rx_pkts <- t.rx_pkts + Int32.to_int_exn (t.ra.get_reg IXGBE.GPRC);
+  t.tx_pkts <- t.tx_pkts + Int32.to_int_exn (t.ra.get_reg IXGBE.GPTC);
+  let new_rx_bytes =
+    Int32.to_int_exn (t.ra.get_reg IXGBE.GORCL)
+    + (Int32.to_int_exn (t.ra.get_reg IXGBE.GORCH) lsl 32) in
+  t.rx_bytes <- t.rx_bytes + new_rx_bytes;
+  let new_tx_bytes =
+    Int32.to_int_exn (t.ra.get_reg IXGBE.GOTCL)
+    + (Int32.to_int_exn (t.ra.get_reg IXGBE.GOTCH) lsl 32) in
+  t.tx_bytes <- t.tx_bytes + new_tx_bytes;
+  { rx_pkts = t.rx_pkts;
+    tx_pkts = t.tx_pkts;
+    rx_bytes = t.rx_bytes;
+    tx_bytes = t.tx_bytes
+  }
+
+let reset_stats t =
+  ignore @@ get_stats t;
+  t.rx_pkts <- 0;
+  t.tx_pkts <- 0;
+  t.rx_bytes <- 0;
+  t.tx_bytes <- 0
+
 let create ~pci_addr ~rxq ~txq =
   if Unix.getuid () <> 0 then
     warn "not running as root, this will probably fail";
@@ -295,7 +323,14 @@ let create ~pci_addr ~rxq ~txq =
   info "device %s has device id %#x" pci_addr_str device_id;
   let hw =
     PCI.map_resource pci_addr in
-  let ra = register_access_of_hw hw in
+  let ra =
+    { get_reg = IXGBE.get_reg hw;
+      set_reg = IXGBE.set_reg hw;
+      set_flags = IXGBE.set_flags hw;
+      clear_flags = IXGBE.clear_flags hw;
+      wait_set = IXGBE.wait_set hw;
+      wait_clear = IXGBE.wait_clear hw
+    } in
   disable_interrupts ra;
   reset ra;
   disable_interrupts ra;
@@ -309,15 +344,20 @@ let create ~pci_addr ~rxq ~txq =
       rxqs = init_rx ra rxq;
       num_txq = txq;
       txqs = init_tx ra txq;
-      ra
+      ra;
+      rx_pkts = 0;
+      tx_pkts = 0;
+      rx_bytes = 0;
+      tx_bytes = 0
     } in
+  reset_stats t;
   for i = 0 to rxq - 1 do
     start_rx t i
   done;
   for i = 0 to txq - 1 do
     start_tx t i
   done;
-  set_promisc ra;
+  set_promisc t true;
   wait_for_link t;
   t
 
