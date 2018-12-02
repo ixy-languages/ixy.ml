@@ -440,6 +440,7 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
   if n > 0 then
     debug "transmitted %d packets" n;
   t.ra.set_reg (IXGBE.TDT txq_id) (Int32.of_int_exn txq.tx_index);
+  Unix.sleep 1;
   Array.sub bufs ~pos:n ~len:(Array.length bufs - n)
 
 let tx_batch_busy_wait ?clean_large t txq_id bufs =
