@@ -1,6 +1,3 @@
-JBUILDER=jbuilder build
-JBUILDERFLAGS=-j 4
-
 TEST=check_nic uname pci_config blink parse_pci_addr
 APPS=echo fwd pktgen
 
@@ -11,13 +8,19 @@ apps: ${APPS}
 test: ${TEST}
 
 ${TEST}:
-	${JBUILDER} test/$@.exe ${JBUILDERFLAGS}
+	dune build test/$@.exe
 
 ${APPS}:
-	${JBUILDER} app/$@.exe ${JBUILDERFLAGS}
+	dune build app/$@.exe
+
+install:
+	dune install
+
+uninstall:
+	dune uninstall
 
 documentation:
-	${JBUILDER} @doc
+	dune build @doc
 
 clean:
-	jbuilder clean
+	dune clean

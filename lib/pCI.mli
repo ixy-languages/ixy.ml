@@ -1,5 +1,3 @@
-open Core
-
 type t
 (** Type of PCIe addresses. *)
 

@@ -219,7 +219,7 @@ let init_tx ra n =
           num_tx_queue_entries
           descriptor_ring.virt in
       let pkt_bufs =
-        Array.create num_tx_queue_entries Memory.dummy in
+        Array.create ~len:num_tx_queue_entries Memory.dummy in
       { descriptors;
         clean_index = 0;
         tx_index = 0;
@@ -387,13 +387,13 @@ let rx_batch t rxq_id =
     loop 0 in
   let bufs =
     let empty_bufs =
-      Memory.pkt_buf_alloc_batch mempool num_done in
+      Memory.pkt_buf_alloc_batch mempool ~num_bufs:num_done in
     if Array.length empty_bufs <> num_done then
       error "could not allocate enough buffers";
     let receive offset =
       let index = wrap_rx (rxq.rx_index + offset) in
       let buf, rxd = pkt_bufs.(index), descriptors.(index) in
-      Memory.pkt_buf_resize buf (RXD.size rxd);
+      Memory.pkt_buf_resize buf ~size:(RXD.size rxd);
       let new_buf = empty_bufs.(offset) in
       RXD.reset rxd new_buf;
       pkt_bufs.(index) <- new_buf;

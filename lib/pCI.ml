@@ -1,5 +1,7 @@
 open Core
 
+[@@@ocaml.warning "-32"]
+
 type t = string
 
 let of_string str =

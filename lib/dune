@@ -1,0 +1,8 @@
+(ocamllex pCI_addr)
+
+(library 
+ (name ixy)
+ (public_name ixy)
+ (libraries core cstruct-unix)
+ (preprocess (pps ppx_deriving.enum ppx_cstruct))
+ (c_names uname memory))

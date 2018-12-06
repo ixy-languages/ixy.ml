@@ -1,6 +1,8 @@
 open Core
 open Log
 
+[@@@ocaml.warning "-32"]
+
 type t = Cstruct.t
 
 [%%cstruct

@@ -1,0 +1,21 @@
+(executable
+ (name echo)
+ (public_name echo)
+ (modes native)
+ (libraries ixy)
+ (modules echo))
+
+(executable
+ (name fwd)
+ (public_name fwd)
+ (modes native)
+ (libraries ixy)
+ (modules fwd))
+
+(executable
+ (name pktgen)
+ (public_name pktgen)
+ (modes native)
+ (libraries core cstruct ixy)
+ (preprocess (pps ppx_deriving.enum ppx_cstruct))
+ (modules pktgen))

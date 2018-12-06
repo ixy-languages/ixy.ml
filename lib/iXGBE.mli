@@ -187,6 +187,8 @@ type register =
   | RAL of int (* Receive Address Low *)
   | RAH of int (* Receive Address High *)
 
+val register_to_string : register -> string
+
 val get_reg : PCI.hw -> register -> int32
 
 val set_reg : PCI.hw -> register -> int32 -> unit

@@ -14,7 +14,7 @@ let () =
   let index =
     match Int.of_string Sys.argv.(2) with
     | i when i >= 0 && i <= 3 -> i
-    | i -> Log.warn "0 <= index <= 3 not fulfilled"; usage ()
+    | _ -> Log.warn "0 <= index <= 3 not fulfilled"; usage ()
     | exception Failure _ -> Log.warn "index not an integer"; usage () in
   let on =
     match String.lowercase Sys.argv.(3) with

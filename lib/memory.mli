@@ -1,5 +1,3 @@
-open Core
-
 type dma_memory = private {
   virt : Cstruct.t; (** DMA memory wrapped in a Cstruct.t *)
   phys : Cstruct.uint64 (** physical address of the beginning of the DMA memory buffer *)
