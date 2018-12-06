@@ -184,6 +184,8 @@ type register =
   | GORCH (* Good Octets Received Count High *)
   | GOTCL (* Good Octets Transmitted Count Low *)
   | GOTCH (* Good Octets Transmitted Count High *)
+  | RAL of int (* Receive Address Low *)
+  | RAH of int (* Receive Address High *)
 
 val get_reg : PCI.hw -> register -> int32
 

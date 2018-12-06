@@ -59,6 +59,9 @@ val create : pci_addr:PCI.t -> rxq:int -> txq:int -> t
 (** [create ~pci_addr ~rxq ~txq] initializes the NIC located at [pci_addr]
     with [rxq] receive queues and [txq] transmit queues. *)
 
+val get_mac : t -> Cstruct.t
+(** [get_mac dev] returns [dev]'s MAC address. *)
+
 val set_promisc : t -> bool -> unit
 (** [set_promisc dev true] enables promiscuous mode on [dev].
     [set_promisc dev false] disables promiscuous mode on [dev].

@@ -202,6 +202,8 @@ type register =
   | GORCH (* Good Octets Received Count High *)
   | GOTCL (* Good Octets Transmitted Count Low *)
   | GOTCH (* Good Octets Transmitted Count High *)
+  | RAL of int (* Receive Address Low *)
+  | RAH of int (* Receive Address High *)
 
 let register_to_int register =
   match register with
@@ -277,6 +279,8 @@ let register_to_int register =
   | GORCH -> 0x0408C
   | GOTCL -> 0x04090
   | GOTCH -> 0x04094
+  | RAL i -> 0x0A200 + (i * 8)
+  | RAH i -> 0x0A204 + (i * 8)
 
 let register_to_string register =
   match register with
@@ -316,6 +320,8 @@ let register_to_string register =
   | GORCH -> "GORCH"
   | GOTCL -> "GOTCL"
   | GOTCH -> "GOTCH"
+  | RAL i -> sprintf "RAL[%d]" i
+  | RAH i -> sprintf "RAH[%d]" i
 
 let get_reg hw register =
   let data = Cstruct.LE.get_uint32 hw (register_to_int register) in

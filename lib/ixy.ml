@@ -292,6 +292,14 @@ let get_stats t =
     tx_bytes = t.tx_bytes
   }
 
+let get_mac t =
+  let mac = Cstruct.create 6 in
+  let low = t.ra.get_reg (IXGBE.RAL 0) in
+  let high = t.ra.get_reg (IXGBE.RAH 0) in
+  Cstruct.LE.set_uint32 mac 0 low;
+  Cstruct.LE.set_uint16 mac 4 (Int32.to_int_exn high);
+  mac
+
 let reset_stats t =
   ignore @@ get_stats t;
   t.rx_pkts <- 0;
