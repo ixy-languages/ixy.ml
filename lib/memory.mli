@@ -1,3 +1,6 @@
+val pagesize : unit -> int64
+(** [pagesize ()] returns the size of a system page in bytes. *)
+
 type dma_memory = private {
   virt : Cstruct.t; (** DMA memory wrapped in a Cstruct.t *)
   phys : Cstruct.uint64 (** physical address of the beginning of the DMA memory buffer *)

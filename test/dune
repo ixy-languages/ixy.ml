@@ -32,3 +32,10 @@
  (modes native)
  (libraries ixy)
  (modules parse_pci_addr))
+
+(executable
+ (name pagesize)
+ (public_name pagesize)
+ (modes native)
+ (libraries ixy)
+ (modules pagesize))

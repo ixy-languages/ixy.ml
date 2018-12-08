@@ -6,17 +6,23 @@ type dma_memory = {
   phys : Cstruct.uint64
 }
 
-external int64_of_addr : Cstruct.t -> Cstruct.uint64 = "ixy_int64_of_addr"
+external pagesize : unit -> int64 = "ixy_pagesize"
 
-external mlock : Cstruct.t -> unit = "ixy_mlock"
+external ixy_int64_of_addr :
+  Cstruct.buffer -> int -> Cstruct.uint64 = "ixy_int64_of_addr"
+
+let int64_of_addr Cstruct.{ buffer; off; _ } =
+  ixy_int64_of_addr buffer off
+
+external ixy_mlock : Cstruct.buffer -> int -> int -> unit = "ixy_mlock"
+
+let mlock Cstruct.{ buffer; off; len } =
+  ixy_mlock buffer off len
 
 let virt_to_phys virt =
   if Obj.is_int (Obj.repr virt) then
     raise (Invalid_argument "virt must be a pointer");
-  let pagesize =
-    match Unix.(sysconf PAGESIZE) with
-    | None -> error "cannot get pagesize"
-    | Some n -> n in
+  let pagesize = pagesize () in
   let fd = Unix.(openfile ~mode:[O_RDONLY] "/proc/self/pagemap") in
   let addr = int64_of_addr virt in
   let offset = Int64.(addr / pagesize * 8L) in

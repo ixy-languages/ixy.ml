@@ -1,4 +1,4 @@
-TEST=check_nic uname pci_config blink parse_pci_addr
+TEST=check_nic uname pci_config blink parse_pci_addr pagesize
 APPS=echo fwd pktgen
 
 all: ${TEST} ${APPS}
