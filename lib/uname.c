@@ -14,10 +14,10 @@ CAMLprim value ixy_uname(value unit) {
     if (uname(&name))
         uerror("uname", Nothing);
     result = caml_alloc(5, 0);
-    Field(result, 0) = caml_copy_string(name.sysname);
-    Field(result, 1) = caml_copy_string(name.nodename);
-    Field(result, 2) = caml_copy_string(name.release);
-    Field(result, 3) = caml_copy_string(name.version);
-    Field(result, 4) = caml_copy_string(name.machine);
+    Store_field(result, 0, caml_copy_string(name.sysname));
+    Store_field(result, 1, caml_copy_string(name.nodename));
+    Store_field(result, 2, caml_copy_string(name.release));
+    Store_field(result, 3, caml_copy_string(name.version));
+    Store_field(result, 4, caml_copy_string(name.machine));
     CAMLreturn(result);
 }
