@@ -19,6 +19,6 @@
  (public_name pktgen)
  (modes native)
  (libraries core cstruct ixy)
- (preprocess (pps ppx_deriving.enum ppx_cstruct))
+ (preprocess (pps ppx_cstruct))
  (ocamlopt_flags :standard -O3)
  (modules pktgen))

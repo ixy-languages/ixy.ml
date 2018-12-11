@@ -3,7 +3,7 @@
 (library
  (name ixy)
  (public_name ixy)
- (libraries core cstruct-unix)
- (preprocess (pps ppx_deriving.enum ppx_cstruct))
+ (libraries core)
+ (preprocess (pps ppx_cstruct))
  (ocamlopt_flags :standard -O3)
  (c_names uname memory))
