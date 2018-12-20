@@ -8,3 +8,10 @@ let mmap fd =
   let genarray =
     Bigarray.(Caml.Unix.map_file fd char c_layout true [|-1|]) in
   Cstruct.of_bigarray (Bigarray.array1_of_genarray genarray)
+
+let wait delay =
+  let rec loop rem =
+    let t = Unix.nanosleep rem in
+    if t <> 0. then
+      loop t in
+  loop delay

@@ -81,7 +81,7 @@ let reset ra =
   info "resetting";
   ra.set_reg IXGBE.CTRL IXGBE.CTRL.ctrl_rst_mask;
   ra.wait_clear IXGBE.CTRL IXGBE.CTRL.ctrl_rst_mask;
-  ignore @@ Unix.nanosleep 0.01;
+  Util.wait 0.01;
   info "reset done"
 
 let init_link ra =
@@ -264,7 +264,7 @@ let wait_for_link t =
     | _, false
     | `SPEED_UNKNOWN, _ ->
       if rem > 0. then begin
-        ignore @@ Unix.nanosleep poll_interval;
+        Util.wait poll_interval;
         loop (rem -. poll_interval)
       end
     | `SPEED_10G, true ->
@@ -368,6 +368,25 @@ let create ~pci_addr ~rxq ~txq =
   set_promisc t true;
   wait_for_link t;
   t
+
+let shutdown t =
+  info "shutting down device %s" t.pci_addr;
+  let shutdown_rx i _rxq =
+    info "shutting down rxq %d" i;
+    t.ra.clear_flags (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
+    t.ra.wait_clear (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
+    Util.wait 0.0001 in
+  let shutdown_tx i txq =
+    info "shutting down txq %d" i;
+    debug "waiting for %s" IXGBE.(register_to_string (TDH i));
+    while t.ra.get_reg (IXGBE.TDH i) <> (Int32.of_int_exn txq.tx_index) do
+      Util.wait 0.01
+    done;
+    debug "done waiting";
+    t.ra.clear_flags (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable;
+    t.ra.wait_clear (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable in
+  Array.iteri t.rxqs ~f:shutdown_rx;
+  Array.iteri t.txqs ~f:shutdown_tx
 
 let rx_batch t rxq_id =
   let wrap_rx index =

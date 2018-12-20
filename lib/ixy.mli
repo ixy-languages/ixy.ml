@@ -59,6 +59,10 @@ val create : pci_addr:PCI.t -> rxq:int -> txq:int -> t
 (** [create ~pci_addr ~rxq ~txq] initializes the NIC located at [pci_addr]
     with [rxq] receive queues and [txq] transmit queues. *)
 
+val shutdown : t -> unit
+(** [shutdown dev] disables all rx and tx queues on [dev] and resets the device.
+    The device must not be used afterwards. *)
+
 val get_mac : t -> Cstruct.t
 (** [get_mac dev] returns [dev]'s MAC address. *)
 

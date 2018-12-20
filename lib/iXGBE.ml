@@ -340,10 +340,10 @@ let clear_flags hw register flags =
 
 let wait_clear hw register mask =
   while Int32.((get_reg hw register) land mask <> 0l) do
-    ignore @@ Unix.nanosleep 0.01
+    Util.wait 0.01
   done
 
 let wait_set hw register mask =
   while Int32.((get_reg hw register) land mask <> mask) do
-    ignore @@ Unix.nanosleep 0.01
+    Util.wait 0.01
   done
