@@ -12,7 +12,7 @@ type hw = Cstruct.t
 (** Type of register files (also called [hw] in the linux ixgbe driver). *)
 
 val map_resource : t -> hw
-(** [map_resource pci_addr] *)
+(** [map_resource pci_addr] maps [pci_addr]'s regeister file. *)
 
 type pci_config = private {
   vendor : int;
