@@ -57,4 +57,5 @@ val pkt_buf_free : pkt_buf -> unit
     Double frees will violate the [mempool's] invariants! *)
 
 val dummy : pkt_buf
-(** [dummy] is a dummy [pkt_buf] that can be used to pre-fill arrays. *)
+(** [dummy] is a dummy [pkt_buf] that can be used to pre-fill arrays.
+    Raises [Invalid_argument] exception when freed. *)
