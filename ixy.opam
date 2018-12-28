@@ -11,7 +11,6 @@ build: [
 ]
 depends: [
   "core"
-  "cstruct-unix"
   "ppx_cstruct"
   "dune" {build}
 ]
