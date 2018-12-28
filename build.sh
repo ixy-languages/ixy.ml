@@ -13,18 +13,12 @@ if [ ! -d "~/.opam" ]; then
 
   # install OCaml 4.07.0
   opam update
-  opam switch 4.07.0
-
-  # install ixy
-  opam pin add . -y
+  opam switch 4.07.0 # Debian still uses opam 1.2.2
 fi
 
 eval `opam config env`
 
-# build apps (echo, fwd, ...)
-make apps
-
-# symlink into current directory
-ln -fs _build/default/app/echo.exe echo
-ln -fs _build/default/app/fwd.exe fwd
-ln -fs _build/default/app/pktgen.exe pktgen
+# build apps (echo, fwd, pktgen)
+make
+# install apps as ixy-{echo,fwd,pktgen}
+make install

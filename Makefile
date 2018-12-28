@@ -1,25 +1,20 @@
 TEST=check_nic uname pci_config blink parse_pci_addr pagesize
-APPS=echo fwd pktgen
 
-all: ${TEST} ${APPS}
-
-apps: ${APPS}
+all:
+	dune build @install
 
 test: ${TEST}
 
 ${TEST}:
 	dune build test/$@.exe
 
-${APPS}:
-	dune build app/$@.exe
-
-install:
+install: all
 	dune install
 
-uninstall:
+uninstall: all
 	dune uninstall
 
-documentation:
+docs:
 	dune build @doc
 
 clean:
