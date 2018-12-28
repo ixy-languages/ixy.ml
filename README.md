@@ -21,6 +21,14 @@ sudo ixy-pktgen <PCI address of the controller you want to use>
 * simple API
 * interactive development in `ocaml`/`utop`
 
+## Further Reading
+
+* [**Driver Internals**](./doc/memory.md)
+* [**OCaml Internals**](./doc/ocaml_internals.md)
+* [**How-to-OCaml**](./doc/ocaml_basics.md)
+* [**Intel 82599 Datasheet**](https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf)
+* [**ixy in other languages**](https://github.com/ixy-languages/ixy-languages)
+
 ## Documentation
 
 ### API Documentation
@@ -238,4 +246,5 @@ DMA may corrupt memory.
 
 ## Other languages
 
-Check out the [other ixy implementations](https://github.com/ixy-languages).
+ixy has also been written in other languages.
+Check out the [other ixy implementations](https://github.com/ixy-languages/ixy-languages).
