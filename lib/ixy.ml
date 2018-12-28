@@ -319,14 +319,14 @@ let create ~pci_addr ~rxq ~txq =
   let pci_addr_str = PCI.to_string pci_addr in
   begin match class_code, subclass, prog_if, vendor with
     | 0x2, 0x0, 0x0, v when v = PCI.vendor_intel -> ()
-    | 0x1, 0x0, 0x0, v when v = PCI.vendor_intel -> (* TODO make these errors *)
-      warn "device %s is configured as SCSI storage device in EEPROM" pci_addr_str
+    | 0x1, 0x0, 0x0, v when v = PCI.vendor_intel ->
+      error "device %s is configured as SCSI storage device in EEPROM" pci_addr_str
     | 0x2, 0x0, _, v when v <> PCI.vendor_intel ->
-      warn "device %s is a non-Intel NIC (vendor: %#x)" pci_addr_str vendor
+      error "device %s is a non-Intel NIC (vendor: %#x)" pci_addr_str vendor
     | 0x2, _, _, _ ->
-      warn "device %s is not an Ethernet NIC (subclass: %#x)" pci_addr_str subclass
+      error "device %s is not an Ethernet NIC (subclass: %#x)" pci_addr_str subclass
     | _ ->
-      warn "device %s is not a NIC (class: %#x)" pci_addr_str class_code
+      error "device %s is not a NIC (class: %#x)" pci_addr_str class_code
   end;
   info "device %s has device id %#x" pci_addr_str device_id;
   let hw =
