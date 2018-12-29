@@ -1,7 +1,7 @@
 # Memory
 
 This document details the memory interface used by the ixy.ml driver and the Intel 82599 NIC to communicate with each other.
-This document references the [Intel® 82599 10 GbE Controller Datasheet](https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf). (TODO add references)
+This document references the [Intel® 82599 10 GbE Controller Datasheet](https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf).
 This document (as well as ixy.ml itself) assumes a word size of 64 bit.
 
 ixy refers to the [original C implementation by Paul Emmerich](https://github.com/emmericp/ixy) while ixy.ml refers to the [OCaml reimplementation by Fabian Bonk](https://github.com/ixy-languages/ixy.ml).
@@ -92,6 +92,42 @@ This chapter only details Advanced Receive Descriptors (7.1.6).
 A rx descriptor is 16 bytes/2 words in size.
 Its format changes depending on if the descriptor was written by the driver (read format, 7.1.6.1) or the NIC (write-back format, 7.1.6.2).
 
+From `ixgbe_type.h` in the official `ixgbe` driver:
+```c
+/* Receive Descriptor - Advanced */
+union ixgbe_adv_rx_desc {
+  struct {
+    __le64 pkt_addr; /* Packet buffer address */
+    __le64 hdr_addr; /* Header buffer address */
+  } read;
+  struct {
+    struct {
+      union {
+        __le32 data;
+        struct {
+          __le16 pkt_info; /* RSS, Pkt type */
+          __le16 hdr_info; /* Splithdr, hdrlen */
+        } hs_rss;
+      } lo_dword;
+      union {
+        __le32 rss; /* RSS Hash */
+        struct {
+          __le16 ip_id; /* IP id */
+          __le16 csum; /* Packet Checksum */
+        } csum_ip;
+      } hi_dword;
+    } lower;
+    struct {
+      __le32 status_error; /* ext status/error */
+      __le16 length; /* Packet length */
+      __le16 vlan; /* VLAN tag */
+    } upper;
+  } wb;  /* writeback */
+};
+```
+
+`ixgbe_adv_rx_desc.read` is the read format; `ixgbe_adv_rx_desc.wb` is the write-back format.
+
 ### Read Format
 
 The read format consists of two fields, each one word in size.
@@ -99,6 +135,17 @@ The driver writes the physical address of the packet buffer that is being descri
 The second word contains a number of flags describing the buffer; the flags need to be reset when resetting a descriptor.
 Resetting is done by writing `0` to the second word.
 When the NIC receives a packet it writes the packet to the address specified in the first word.
+
+The read format accessors are generated from the following ppx_cstruct definition:
+
+```ocaml
+[%%cstruct
+  type adv_rxd_read = {
+    pkt_addr : uint64;
+    hdr_addr : uint64
+  } [@@little_endian]
+]
+```
 
 ### Write-Back Format
 
@@ -110,6 +157,22 @@ Additionally ixy and ixy.ml check if the End Of Packet (`EOP`) bit is set.
 
 Bits 32 through 47 of the second word of the write-back format indicate the received packet's length in bytes.
 
+The write-back format accessors are generated from the following ppx_cstruct definition:
+
+```ocaml
+[%%cstruct
+  type adv_rxd_wb = {
+    pkt_info : uint16;
+    hdr_info : uint16;
+    ip_id : uint16;
+    csum : uint16;
+    status_error : uint32;
+    length : uint16;
+    vlan : uint16
+  } [@@little_endian]
+]
+```
+
 ## Transmit Descriptors (tx descriptors)
 
 This chapter only details Advanced Receive Descriptors (7.2.3.2.4).
@@ -117,12 +180,42 @@ This chapter only details Advanced Receive Descriptors (7.2.3.2.4).
 Like an rx descriptor, a tx descriptor is 16 bytes/2 words in size.
 It, too, has read and write-back formats.
 
+From `ixgbe_type.h` in the official `ixgbe` drivers:
+```c
+/* Transmit Descriptor - Advanced */
+union ixgbe_adv_tx_desc {
+  struct {
+    __le64 buffer_addr; /* Address of descriptor's data buf */
+    __le32 cmd_type_len;
+    __le32 olinfo_status;
+  } read;
+  struct {
+    __le64 rsvd; /* Reserved */
+    __le32 nxtseq_seed;
+    __le32 status;
+  } wb;
+};
+```
+
+Yet again `ixgbe_adv_tx_desc.read` is the read format; `ixgbe_adv_tx_desc.wb` is the write-back format.
+
 ### Read Format
 
 The read format contains the physical address of a packet buffer that is to be transmitted.
 Additionally there are a number of flags that need to be set.
 Finally the payload's length needs to be specified.
-See [`lib/tXD.ml`](../lib/tXD.ml).
+
+The read format accessors are generated from the following ppx_cstruct definition:
+
+```ocaml
+[%%cstruct
+  type adv_tx_read = {
+    buffer_addr : uint64;
+    cmd_type_len : uint32;
+    olinfo_status : uint32
+  } [@@little_endian]
+]
+```
 
 ### Write-back Format
 
@@ -130,6 +223,18 @@ The write-back format consists almost entirely of reserved bits (according to th
 The only actual flag is the `DD` flag.
 Once this flag has been set, the NIC has transmitted the packet stored in the corresponding packet buffer.
 The packet buffer is then ready to be cleaned.
+
+The write-back format accessors are generated from the following ppx_cstruct definition:
+
+```ocaml
+[%%cstruct
+  type adv_tx_wb = {
+    rsvd : uint64;
+    nxtseq_seed : uint32;
+    status : uint32
+  } [@@little_endian]
+]
+```
 
 ## Descriptor Ring
 
@@ -224,19 +329,19 @@ Like rx queues, tx queues maintain a descriptor ring.
  |       v
  |   +--------+ <- base address            |
  |   |        |                            |
-w|   | empty  |                            |
-r|   |        |                            |
-a|   +--------+ <- base + clean_index      |
-p|   |        |                            |i
- |   | dirty  |                            |n
-a|   |        |                            |c
-r|   +--------+ <- base + head             |r
-o|   |        |                            |e
-u|   |        |                            |m
-n|   | unsent |                            |e
-d|   |        |                            |n
- |   |        |                            |t
- |   +--------+ <- base + tail (tx_index)  |
+ |   | empty  |                            |
+ |   |        |                            |
+w|   +--------+ <- base + clean_index      |
+r|   |        |                            |i
+a|   | dirty  |                            |n
+p|   |        |                            |c
+ |   +--------+ <- base + head             |r
+a|   |        |                            |e
+r|   |        |                            |m
+o|   | unsent |                            |e
+u|   |        |                            |n
+n|   |        |                            |t
+d|   +--------+ <- base + tail (tx_index)  |
  |   |        |                            |
  |   | empty  |                            |
  |   |        |                            |
