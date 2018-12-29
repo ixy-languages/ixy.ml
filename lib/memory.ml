@@ -87,8 +87,7 @@ and pkt_buf = {
   phys : Cstruct.uint64;
   mempool : mempool;
   mutable size : int;
-  data : Cstruct.t;
-  mutable is_free : bool
+  data : Cstruct.t
 }
 
 let dummy =
@@ -101,8 +100,7 @@ let dummy =
   { phys = 0L;
     mempool = dummy_pool;
     size = 0;
-    data = Cstruct.empty;
-    is_free = true
+    data = Cstruct.empty
   }
 
 let allocate_mempool ?pre_fill ~num_entries =
@@ -131,8 +129,7 @@ let allocate_mempool ?pre_fill ~num_entries =
     { phys = virt_to_phys data;
       mempool;
       size;
-      data;
-      is_free = true
+      data
     } in
   Array.iteri
     mempool.free_bufs
@@ -150,7 +147,6 @@ let pkt_buf_alloc_batch ({ num_entries; free; free_bufs; _ } as mempool) ~num_bu
   let n = Int.min num_bufs free in
   let alloc_start = free - n in
   let bufs = Array.sub free_bufs ~pos:alloc_start ~len:n in
-  Array.iter bufs ~f:(fun buf -> buf.is_free <- false);
   mempool.free <- alloc_start;
   bufs
 
@@ -159,16 +155,11 @@ let pkt_buf_alloc ({ free; free_bufs; _ } as mempool) =
   if free > 0 then
     let index = free - 1 in
     mempool.free <- index;
-    let buf = free_bufs.(index) in
-    buf.is_free <- false;
-    Some buf
+    Some free_bufs.(index)
   else
     None
 
 let pkt_buf_free ({ mempool = ({ free; free_bufs; _ } as mempool); _ } as buf) =
-  if buf.is_free then
-    error "double free detected";
-  buf.is_free <- true;
   free_bufs.(free) <- buf;
   mempool.free <- free + 1
 

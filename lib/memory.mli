@@ -32,8 +32,7 @@ type pkt_buf = private {
   phys : Cstruct.uint64;
   mempool : mempool;
   mutable size : int;
-  data : Cstruct.t;
-  mutable is_free : bool
+  data : Cstruct.t
 }
 (** Type of a packet buffer. *)
 
