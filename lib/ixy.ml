@@ -435,22 +435,25 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
   let clean_ahead offset =
     (* cleanup_to points to the first descriptor we won't clean *)
     let cleanup_to =
-      wrap_tx (txq.clean_index + offset - 1) in
+      wrap_tx (txq.clean_index + offset) in
     let rec loop i =
-      Memory.pkt_buf_free pkt_bufs.(i);
-      if i <> cleanup_to then
-        loop (wrap_tx (i + 1)) in
+      if i <> cleanup_to then begin
+        Memory.pkt_buf_free pkt_bufs.(i);
+        loop (wrap_tx (i + 1))
+      end in
     loop txq.clean_index;
-    txq.clean_index <- wrap_tx (cleanup_to + 1) in
+    txq.clean_index <- cleanup_to in
   if clean_large then begin
-    if check 128 then (* possibly quicker batching *)
+    (* possibly quicker batching *)
+    if check 128 then
       clean_ahead 128
     else if check 64 then
       clean_ahead 64
     else if check 32 then
       clean_ahead 32
   end else
-    while check tx_clean_batch do (* default ixy behavior *)
+    (* default ixy behavior *)
+    while check tx_clean_batch do
       clean_ahead tx_clean_batch
     done;
   let num_empty_descriptors =
