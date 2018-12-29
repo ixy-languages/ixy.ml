@@ -11,8 +11,5 @@ let () =
   let dev = Ixy.create ~pci_addr ~rxq:1 ~txq:1 in
   while true do
     let rx = Ixy.rx_batch dev 0 in
-    let n = Array.length rx in
-    if n > 0 then
-      Ixy.Log.info "echoing %d packets" n;
     Ixy.tx_batch_busy_wait dev 0 rx;
   done

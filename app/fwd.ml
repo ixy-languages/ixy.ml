@@ -1,12 +1,5 @@
 let forward rx_dev tx_dev =
   let rx = Ixy.rx_batch rx_dev 0 in
-  let n = Array.length rx in
-  if n > 0 then
-    Ixy.Log.info
-      "forwarding %d packets from %s to %s"
-      n
-      rx_dev.Ixy.pci_addr
-      tx_dev.Ixy.pci_addr;
   Ixy.tx_batch_busy_wait tx_dev 0 rx
 
 let usage () =
