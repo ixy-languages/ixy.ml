@@ -1,6 +1,13 @@
 let forward rx_dev tx_dev =
   let rx = Ixy.rx_batch rx_dev 0 in
-  Ixy.tx_batch_busy_wait tx_dev 0 rx
+  (* touch all received packets *)
+  Array.iter
+    Ixy.Memory.(fun pkt ->
+        Cstruct.(set_uint8 pkt.data 48 (1 + get_uint8 pkt.data 48)))
+    rx;
+  Ixy.tx_batch tx_dev 0 rx
+  (* free packets that cannot be sent immediately *)
+  |> Array.iter Ixy.Memory.pkt_buf_free
 
 let usage () =
   Ixy.Log.error "Usage: %s <pci_addr> <pci_addr>" Sys.argv.(0)

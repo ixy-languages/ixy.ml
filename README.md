@@ -145,6 +145,8 @@ ixy-fwd <pci_addr> <pci_addr>
 ```
 
 `ixy-fwd` will create a single receive queue and a single transmit queue on each device specified by the `<pci_addr>`s and forward all packets received on on device's receive queue onto the other device's transmit queue.
+Each packet's 49th byte will be incremented by 1 to simulate a somewhat realistic payload.
+All packets that cannot be transmitted immediately will be dropped.
 
 #### [`ixy-pktgen`](./app/pktgen.ml)
 
