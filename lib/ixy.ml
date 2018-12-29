@@ -447,10 +447,7 @@ let tx_batch t txq_id bufs =
     clean_ahead tx_clean_batch
   done;
   let num_empty_descriptors =
-    if txq.clean_index = txq.tx_index then
-      num_tx_queue_entries
-    else
-      wrap_tx (txq.clean_index - txq.tx_index - 1) in
+    wrap_tx (txq.clean_index - txq.tx_index - 1) in
   let n = Int.min num_empty_descriptors (Array.length bufs) in
   for i = 0 to n - 1 do
     (* send packet *)
