@@ -1,4 +1,3 @@
-#include <unistd.h>
 #include <inttypes.h>
 #include <sys/mman.h>
 
@@ -9,14 +8,6 @@
 #include <caml/mlvalues.h>
 #include <caml/unixsupport.h>
 #include <caml/bigarray.h>
-
-CAMLprim value ixy_pagesize(value v_unit) {
-    CAMLparam1(v_unit);
-    long pagesize = sysconf(_SC_PAGESIZE);
-    if (pagesize == -1)
-        uerror("sysconf", Nothing);
-    return caml_copy_int64(pagesize);
-}
 
 CAMLprim value ixy_int64_of_addr(value v_buf, value v_off) {
     CAMLparam2(v_buf, v_off);

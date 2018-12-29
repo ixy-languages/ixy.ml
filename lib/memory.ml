@@ -6,7 +6,10 @@ type dma_memory = {
   phys : Cstruct.uint64
 }
 
-external pagesize : unit -> int64 = "ixy_pagesize"
+let pagesize () =
+  match Unix.(sysconf PAGESIZE) with
+  | None -> error "cannot get pagesize"
+  | Some n -> n
 
 external ixy_int64_of_addr :
   Cstruct.buffer -> int -> Cstruct.uint64 = "ixy_int64_of_addr"
