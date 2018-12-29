@@ -11,6 +11,15 @@ let () =
     | None -> usage ()
     | Some pci -> pci in
   let dev = Ixy.create ~pci_addr ~rxq:1 ~txq:1 in
+  let mac = Ixy.get_mac dev in
+  Ixy.Log.info
+    "MAC: %02x:%02x:%02x:%02x:%02x:%02x\n"
+    (Cstruct.get_uint8 mac 0)
+    (Cstruct.get_uint8 mac 1)
+    (Cstruct.get_uint8 mac 2)
+    (Cstruct.get_uint8 mac 3)
+    (Cstruct.get_uint8 mac 4)
+    (Cstruct.get_uint8 mac 5);
   let speed, up = Ixy.check_link dev in
   begin
     match speed with

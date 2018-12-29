@@ -1,7 +1,7 @@
 (executable
  (name check_nic)
  (modes native)
- (libraries core ixy)
+ (libraries core cstruct ixy)
  (modules check_nic))
 
 (executable
