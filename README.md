@@ -28,6 +28,9 @@ sudo ixy-pktgen <PCI address of the controller you want to use>
 * [**How-to-OCaml**](./doc/ocaml_basics.md)
 * [**Intel 82599 Datasheet**](https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf)
 * [**ixy in other languages**](https://github.com/ixy-languages/ixy-languages)
+* [**FreeBSD ixgbe driver**](https://github.com/freebsd/freebsd/tree/master/sys/dev/ixgbe)
+* [**DPDK ixgbe driver**](https://github.com/DPDK/dpdk/tree/master/drivers/net/ixgbe)
+* [**Linux ixgbe driver**](https://github.com/torvalds/linux/tree/master/drivers/net/ethernet/intel/ixgbe)
 
 ## Documentation
 
@@ -209,6 +212,8 @@ In `ocaml`/`utop` do:
 Be careful when accessing registers via the [`IXGBE`](./lib/ixgbe.ml) module; the NIC has DMA access and can write basically anywhere in physical memory.
 
 ## System requirements
+
+* OCaml 4.06.0 or later
 
 * x86_64
 
