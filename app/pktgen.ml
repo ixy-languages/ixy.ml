@@ -97,5 +97,5 @@ let () =
       ~f:(fun Ixy.Memory.{ data; _ } ->
           Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
           Int32.incr seq_num);
-    Ixy.tx_batch_busy_wait ~clean_large:false dev 0 bufs
+    Ixy.tx_batch_busy_wait dev 0 bufs
   done

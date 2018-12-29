@@ -424,7 +424,7 @@ let rx_batch t rxq_id =
   end;
   bufs
 
-let tx_batch ?(clean_large = false) t txq_id bufs =
+let tx_batch t txq_id bufs =
   let wrap_tx index =
     index land (num_tx_queue_entries - 1) in
   let { descriptors; pkt_bufs; _ } as txq = t.txqs.(txq_id) in
@@ -443,19 +443,9 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
       end in
     loop txq.clean_index;
     txq.clean_index <- cleanup_to in
-  if clean_large then begin
-    (* possibly quicker batching *)
-    if check 128 then
-      clean_ahead 128
-    else if check 64 then
-      clean_ahead 64
-    else if check 32 then
-      clean_ahead 32
-  end else
-    (* default ixy behavior *)
-    while check tx_clean_batch do
-      clean_ahead tx_clean_batch
-    done;
+  while check tx_clean_batch do
+    clean_ahead tx_clean_batch
+  done;
   let num_empty_descriptors =
     if txq.clean_index = txq.tx_index then
       num_tx_queue_entries
@@ -472,9 +462,9 @@ let tx_batch ?(clean_large = false) t txq_id bufs =
   t.ra.set_reg (IXGBE.TDT txq_id) (Int32.of_int_exn txq.tx_index);
   Array.sub bufs ~pos:n ~len:(Array.length bufs - n)
 
-let tx_batch_busy_wait ?clean_large t txq_id bufs =
+let tx_batch_busy_wait t txq_id bufs =
   let rec send bufs =
-    let rest = tx_batch ?clean_large t txq_id bufs in
+    let rest = tx_batch t txq_id bufs in
     if rest <> [||] then
       send rest in
   send bufs

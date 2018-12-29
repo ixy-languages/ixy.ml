@@ -92,12 +92,12 @@ val rx_batch : t -> int -> Memory.pkt_buf array
 (** [rx_batch dev queue] attempts to receive packets from [dev]'s queue [queue].
     Returns between [0] and [num_rx_queue_entries] packets. *)
 
-val tx_batch : ?clean_large:bool -> t -> int -> Memory.pkt_buf array -> Memory.pkt_buf array
-(** [tx_batch ~clean_large dev queue bufs] attempts to transmit [bufs] on
+val tx_batch : t -> int -> Memory.pkt_buf array -> Memory.pkt_buf array
+(** [tx_batch dev queue bufs] attempts to transmit [bufs] on
     [dev]'s queue [queue]. Returns the unsent packets. *)
 
-val tx_batch_busy_wait : ?clean_large:bool -> t -> int -> Memory.pkt_buf array -> unit
-(** [tx_batch_busy_wait ~clean_large dev queue bufs] busy waits until all [bufs]
+val tx_batch_busy_wait : t -> int -> Memory.pkt_buf array -> unit
+(** [tx_batch_busy_wait dev queue bufs] busy waits until all [bufs]
     have been transmitted on [dev]'s queue [queue] by repeatedly calling
     [tx_batch]. *)
 

@@ -376,13 +376,6 @@ However, it is inefficient to check every descriptor's `DD` bit.
 Therefore ixy checks the descriptor 32 ahead of `clean_index`; if this descriptor's `DD` bit is set, all the buffers that were skipped can also be cleaned.
 After cleaning these buffers, `clean_index` can be incremented by 32 and the whole process can be repeated until a buffer, whose `DD` bit isn't set, is hit.
 
-In addition to ixy's behavior, ixy.ml supports another cleanup strategy; this behavior can be switched on or off when calling `tx_batch`:
-Optionally ixy.ml checks the descriptor 128 ahead of `clean_index`.
-If this descriptor's `DD` bit is set, all 128 buffers can be cleaned at once and cleaning is done; remaining buffers will be cleaned upon the next call to `tx_batch`.
-If the `DD` bit is not set, the same procedure will be repeated for offsets 64 and 32.
-This favors large collections at once, thereby reducing the amount of memory reads and increasing the amount of descriptors cleaned in a single pass.
-If `tx_batch` is called with `~clean_large:true` the second strategy will be chosen, otherwise ixy's behavior will be replicated.
-
 #### Transmit
 
 To transmit packets the driver just walks the descriptor ring, setting each descriptor to one of the packets that are to be transmitted, until it has sent all packets or hits a non-cleaned descriptor.
