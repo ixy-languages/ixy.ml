@@ -428,23 +428,18 @@ let tx_batch t txq_id bufs =
   let wrap_tx index =
     index land (num_tx_queue_entries - 1) in
   let { descriptors; pkt_bufs; _ } as txq = t.txqs.(txq_id) in
-  (* returns wether or not the descriptor at clean_index + offset can be cleaned *)
-  let check offset =
+  (* Returns wether or not tx_clean_batch descriptors can be cleaned. *)
+  let check_clean () =
     let cleanable = wrap_tx (txq.tx_index - txq.clean_index) in
-    cleanable >= offset && TXD.dd descriptors.(wrap_tx (txq.clean_index + offset - 1)) in
-  let clean_ahead offset =
-    (* cleanup_to points to the first descriptor we won't clean *)
-    let cleanup_to =
-      wrap_tx (txq.clean_index + offset) in
-    let rec loop i =
-      if i <> cleanup_to then begin
-        Memory.pkt_buf_free pkt_bufs.(i);
-        loop (wrap_tx (i + 1))
-      end in
-    loop txq.clean_index;
-    txq.clean_index <- cleanup_to in
-  while check tx_clean_batch do
-    clean_ahead tx_clean_batch
+    cleanable >= tx_clean_batch
+    && TXD.dd descriptors.(wrap_tx (txq.clean_index + tx_clean_batch - 1)) in
+  let clean () =
+    for i = 0 to tx_clean_batch - 1 do
+      Memory.pkt_buf_free pkt_bufs.(wrap_tx (txq.clean_index + i))
+    done;
+    txq.clean_index <- wrap_tx (txq.clean_index + tx_clean_batch) in
+  while check_clean () do
+    clean ()
   done;
   let num_empty_descriptors =
     wrap_tx (txq.clean_index - txq.tx_index - 1) in
