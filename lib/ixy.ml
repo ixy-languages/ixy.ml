@@ -388,7 +388,7 @@ let shutdown t =
   Array.iteri t.rxqs ~f:shutdown_rx;
   Array.iteri t.txqs ~f:shutdown_tx
 
-let rx_batch t rxq_id =
+let rx_batch ?(batch_size = Int.max_value) t rxq_id =
   let wrap_rx index =
     index land (num_rx_queue_entries - 1) in
   let { descriptors; pkt_bufs; mempool; _ } as rxq =
@@ -403,7 +403,7 @@ let rx_batch t rxq_id =
           loop (offset + 1)
       else
         offset in
-    loop 0 in
+    Int.min batch_size (loop 0) in
   let bufs =
     let empty_bufs =
       Memory.pkt_buf_alloc_batch mempool ~num_bufs:num_done in

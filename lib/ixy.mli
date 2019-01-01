@@ -88,9 +88,11 @@ val get_stats : t -> stats
 (** [get_stats dev] returns the number of packets/bytes received/sent
     on [dev] since initialization or the last call to [reset_stats]. *)
 
-val rx_batch : t -> int -> Memory.pkt_buf array
+val rx_batch : ?batch_size:int -> t -> int -> Memory.pkt_buf array
 (** [rx_batch dev queue] attempts to receive packets from [dev]'s queue [queue].
-    Returns between [0] and [num_rx_queue_entries] packets. *)
+    Returns between [0] and [num_rx_queue_entries] packets.
+    If [batch_size] is specified then between [0] and [batch_size] packets
+    will be returned. *)
 
 val tx_batch : t -> int -> Memory.pkt_buf array -> Memory.pkt_buf array
 (** [tx_batch dev queue bufs] attempts to transmit [bufs] on

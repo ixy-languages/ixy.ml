@@ -1,5 +1,5 @@
-let forward rx_dev tx_dev =
-  let rx = Ixy.rx_batch rx_dev 0 in
+let forward batch_size rx_dev tx_dev =
+  let rx = Ixy.rx_batch ?batch_size rx_dev 0 in
   (* touch all received packets *)
   Array.iter
     Ixy.Memory.(fun pkt ->
@@ -10,10 +10,11 @@ let forward rx_dev tx_dev =
   |> Array.iter Ixy.Memory.pkt_buf_free
 
 let usage () =
-  Ixy.Log.error "Usage: %s <pci_addr> <pci_addr>" Sys.argv.(0)
+  Ixy.Log.error "Usage: %s <pci_addr> <pci_addr> [batch_size]" Sys.argv.(0)
 
 let () =
-  if Array.length Sys.argv <> 3 then
+  let argc = Array.length Sys.argv in
+  if argc < 3 || argc > 4 then
     usage ();
   let pci_a, pci_b =
     match Ixy.PCI.(of_string Sys.argv.(1), of_string Sys.argv.(2)) with
@@ -21,7 +22,11 @@ let () =
     | Some a, Some b -> a, b in
   let dev_a = Ixy.create ~pci_addr:pci_a ~rxq:1 ~txq:1 in
   let dev_b = Ixy.create ~pci_addr:pci_b ~rxq:1 ~txq:1 in
+  let batch_size =
+    try Some (int_of_string Sys.argv.(3)) with
+    | Invalid_argument _
+    | Failure _ -> None in
   while true do
-    forward dev_a dev_b;
-    forward dev_b dev_a
+    forward batch_size dev_a dev_b;
+    forward batch_size dev_b dev_a
   done
