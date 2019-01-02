@@ -101,7 +101,7 @@ let rec apply_n_times ~n ~f x =
 
 ### Lambda
 
-Functions don't have to be have names; they can be constructed as lambdas (also called function literal, anonymous function).
+Functions don't have to have names; they can be constructed as lambdas (also called function literal, anonymous function).
 
 ```ocaml
 fun x -> x + 1 (* function that maps each integer to its successor *)
