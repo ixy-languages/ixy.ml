@@ -396,14 +396,14 @@ let rx_batch ?(batch_size = Int.max_value) t rxq_id =
   let num_done =
     let rec loop offset =
       let rxd = descriptors.(wrap_rx (rxq.rx_index + offset)) in
-      if RXD.dd rxd then
+      if offset < batch_size && RXD.dd rxd then
         if not (RXD.eop rxd) then
           error "jumbo frames are not supported"
         else
           loop (offset + 1)
       else
         offset in
-    Int.min batch_size (loop 0) in
+    loop 0 in
   let bufs =
     let empty_bufs =
       Memory.pkt_buf_alloc_batch mempool ~num_bufs:num_done in
