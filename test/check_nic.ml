@@ -1,5 +1,3 @@
-open Core
-
 let usage () =
   Ixy.Log.error "Usage: %s <pci_addr>" Sys.argv.(0)
 

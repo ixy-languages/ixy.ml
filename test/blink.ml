@@ -1,4 +1,3 @@
-open Core
 open Ixy
 
 let usage () =
@@ -12,12 +11,12 @@ let () =
     | None -> usage ()
     | Some pci -> pci in
   let index =
-    match Int.of_string Sys.argv.(2) with
+    match int_of_string Sys.argv.(2) with
     | i when i >= 0 && i <= 3 -> i
     | _ -> Log.warn "0 <= index <= 3 not fulfilled"; usage ()
     | exception Failure _ -> Log.warn "index not an integer"; usage () in
   let on =
-    match String.lowercase Sys.argv.(3) with
+    match String.lowercase_ascii Sys.argv.(3) with
     | "on" -> true
     | "off" -> false
     | _ -> Log.warn "LEDs can only be turned on or off"; usage () in

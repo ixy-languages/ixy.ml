@@ -1,5 +1,3 @@
-open Core
-
 let () =
   let pci_addr =
     match Ixy.PCI.of_string Sys.argv.(1) with

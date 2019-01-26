@@ -1,4 +1,3 @@
-open Core
 open Log
 
 [@@@ocaml.warning "-32"]
@@ -30,11 +29,11 @@ let sizeof = sizeof_adv_rxd_wb
 
 let stat_dd = 0b01l
 
-let dd t = Int32.((get_adv_rxd_wb_status_error t) land stat_dd <> 0l)
+let dd t = Int32.logand (get_adv_rxd_wb_status_error t) stat_dd <> 0l
 
 let stat_eop = 0b10l
 
-let eop t = Int32.((get_adv_rxd_wb_status_error t) land stat_eop <> 0l)
+let eop t = Int32.logand (get_adv_rxd_wb_status_error t) stat_eop <> 0l
 
 let size t = get_adv_rxd_wb_length t
 
@@ -44,7 +43,7 @@ let split num cs =
     error "cstruct is too small (%d bytes) for %d descriptors" len num;
   Array.init
     num
-    ~f:(fun i -> Cstruct.sub cs (i * sizeof) sizeof)
+    (fun i -> Cstruct.sub cs (i * sizeof) sizeof)
 
 let reset cs Memory.{ phys; _ } =
   set_adv_rxd_read_pkt_addr cs phys;

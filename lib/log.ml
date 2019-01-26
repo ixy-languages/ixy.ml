@@ -1,4 +1,3 @@
-open Core
 open Printf
 
 type log_level =
@@ -29,7 +28,7 @@ let ignore_fmt fmt =
 
 let error fmt =
   if !log_level >= ERROR then
-    let label : (string -> unit, Out_channel.t, unit) format =
+    let label : (string -> unit, out_channel, unit) format =
       if !color then
         "\x1b[31m[ERROR] %s\x1b[0m\n%!" (* red *)
       else
@@ -40,19 +39,19 @@ let error fmt =
 
 let errors errs =
   let error err =
-      let label : (string -> unit, Out_channel.t, unit) format =
-        if !color then
-          "\x1b[31m[ERROR] %s\x1b[0m\n%!" (* red *)
-        else
-          "[ERROR] %s\n%!" in
-      fprintf !out_channel label err in
+    let label : (string -> unit, out_channel, unit) format =
+      if !color then
+        "\x1b[31m[ERROR] %s\x1b[0m\n%!" (* red *)
+      else
+        "[ERROR] %s\n%!" in
+    fprintf !out_channel label err in
   if !log_level >= ERROR then
-    List.iter errs ~f:error;
+    List.iter error errs;
   exit 1
 
 let warn fmt =
   if !log_level >= WARNING then
-    let label : (string -> unit, Out_channel.t, unit) format =
+    let label : (string -> unit, out_channel, unit) format =
       if !color then
         "\x1b[33m[WARNING] %s\x1b[0m\n%!" (* yellow *)
       else
@@ -63,7 +62,7 @@ let warn fmt =
 
 let info fmt =
   if !log_level >= INFO then
-    let label : (string -> unit, Out_channel.t, unit) format =
+    let label : (string -> unit, out_channel, unit) format =
       if !color then
         "\x1b[36m[INFO] %s\x1b[0m\n%!" (* cyan *)
       else
@@ -74,7 +73,7 @@ let info fmt =
 
 let debug fmt =
   if !log_level >= DEBUG then
-    let label : (string -> unit, Out_channel.t, unit) format =
+    let label : (string -> unit, out_channel, unit) format =
       if !color then
         "\x1b[35m[DEBUG] %s\x1b[0m\n%!" (* magenta *)
       else
@@ -86,7 +85,7 @@ let debug fmt =
 let confirm ~default fmt =
   let f fmt =
     let prompt () =
-      let label : (string -> string -> unit, Out_channel.t, unit) format =
+      let label : (string -> string -> unit, out_channel, unit) format =
         if !color then
           "\x1b[32m[CONFIRM] %s [%s] \x1b[0m%!" (* green *)
         else
@@ -94,7 +93,7 @@ let confirm ~default fmt =
       printf label fmt (if default then "Y/n" else "y/N") in
     let rec loop () =
       prompt ();
-      match String.lowercase In_channel.(input_line_exn stdin) with
+      match String.lowercase_ascii (input_line stdin) with
       | "y" | "yes" -> true
       | "n" | "no" -> false
       | "" -> default

@@ -1,2 +1,3 @@
 let () =
-  Printf.printf "%Ld\n" (Ixy.Memory.pagesize ())
+  print_int (Ixy.Memory.pagesize ());
+  print_newline ()

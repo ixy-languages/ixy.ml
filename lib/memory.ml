@@ -1,4 +1,3 @@
-open Core
 open Log
 
 type dma_memory = {
@@ -6,10 +5,7 @@ type dma_memory = {
   phys : Cstruct.uint64
 }
 
-let pagesize () =
-  match Unix.(sysconf PAGESIZE) with
-  | None -> error "cannot get pagesize"
-  | Some n -> n
+external pagesize : unit -> int = "ixy_pagesize"
 
 external ixy_int64_of_addr :
   Cstruct.buffer -> int -> Cstruct.uint64 = "ixy_int64_of_addr"
@@ -26,24 +22,22 @@ let virt_to_phys virt =
   if Obj.is_int (Obj.repr virt) then
     raise (Invalid_argument "virt must be a pointer");
   let pagesize = pagesize () in
-  let fd = Unix.(openfile ~mode:[O_RDONLY] "/proc/self/pagemap") in
+  let fd = Unix.(openfile "/proc/self/pagemap" [O_RDONLY] 0o644) in
   let addr = int64_of_addr virt in
-  let offset = Int64.(addr / pagesize * 8L) in
-  if Unix.(lseek fd offset ~mode:SEEK_SET <> offset) then
+  let offset = (Int64.to_int addr) / pagesize * 8 in
+  if Unix.(lseek fd offset SEEK_SET <> offset) then
     error "lseek unsuccessful";
   let buf = Bytes.create 8 in
-  if Unix.(read fd ~buf <> 8) then
+  if Unix.(read fd buf 0 8 <> 8) then
     error "read unsuccessful";
   Unix.close fd;
   let phys =
-    let f i =
-      let i64 =
-        Bytes.get buf i
-        |> Char.to_int
-        |> Int64.of_int in
-      Int64.shift_left i64 (i * 8) in
-    Int64.(f 0 + f 1 + f 2 + f 3 + f 4 + f 5 + f 6 + f 7) in
-  Int64.((phys land 0x7f_ff_ff_ff_ff_ff_ffL) * pagesize + (addr % pagesize))
+    Cstruct.(LE.get_uint64 (of_bytes buf) 0) in
+  let pagesize = Int64.of_int pagesize in
+  let offset =
+    let x = Int64.rem addr pagesize in
+    if x < 0L then Int64.add x pagesize else x in
+  Int64.(add (mul (logand phys 0x7f_ffff_ffff_ffffL) pagesize) offset)
 
 let huge_page_id = ref 0
 
@@ -58,11 +52,12 @@ let allocate_dma ?(require_contiguous = true) size =
       size in
   if require_contiguous && size > huge_page_size then
     error "cannot map contiguous memory";
-  let pid = Core_kernel.Pid.to_int @@ Unix.getpid () in
-  let path = Printf.sprintf "/mnt/huge/ixy.ml-%d-%d" pid !huge_page_id in
+  let pid = Unix.getpid () in
+  let path =
+    Printf.sprintf "/mnt/huge/ixy.ml-%d-%d" pid !huge_page_id in
   incr huge_page_id;
-  let fd = Unix.(openfile ~mode:[O_CREAT; O_RDWR] ~perm:0o777 path) in
-  Unix.ftruncate fd ~len:(Int64.of_int size);
+  let fd = Unix.(openfile path [O_CREAT; O_RDWR] 0o777) in
+  Unix.ftruncate fd size;
   let virt = Util.mmap fd in
   assert (Cstruct.len virt = size); (* TODO maybe remove this later? *)
   mlock virt;
@@ -114,7 +109,7 @@ let allocate_mempool ?pre_fill ~num_entries =
     { entry_size;
       num_entries;
       free = num_entries;
-      free_bufs = Array.create ~len:num_entries dummy
+      free_bufs = Array.make num_entries dummy
     } in
   let init_buf index =
     let data =
@@ -132,8 +127,8 @@ let allocate_mempool ?pre_fill ~num_entries =
       data
     } in
   Array.iteri
-    mempool.free_bufs
-    ~f:(fun i _ -> mempool.free_bufs.(i) <- init_buf i);
+    (fun i _ -> mempool.free_bufs.(i) <- init_buf i)
+    mempool.free_bufs;
   mempool
 
 let num_free_bufs { free; _ } = free
@@ -144,9 +139,9 @@ let pkt_buf_alloc_batch ({ num_entries; free; free_bufs; _ } as mempool) ~num_bu
       "can never allocate %d bufs in a mempool with %d bufs"
       num_bufs
       num_entries;
-  let n = Int.min num_bufs free in
+  let n = min num_bufs free in
   let alloc_start = free - n in
-  let bufs = Array.sub free_bufs ~pos:alloc_start ~len:n in
+  let bufs = Array.sub free_bufs alloc_start n in
   mempool.free <- alloc_start;
   bufs
 
@@ -165,7 +160,7 @@ let pkt_buf_free ({ mempool = ({ free; free_bufs; _ } as mempool); _ } as buf) =
 
 let pkt_buf_resize ({ mempool = { entry_size; _ }; _ } as buf) ~size =
   (* MTU is fixed at 1518 by default. *)
-  let upper = Int.min entry_size IXGBE.default_mtu in
+  let upper = min entry_size IXGBE.default_mtu in
   if size > 0 && size <= upper then
     buf.size <- size
   else

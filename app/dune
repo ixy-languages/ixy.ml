@@ -18,7 +18,7 @@
  (name pktgen)
  (public_name ixy-pktgen)
  (modes native)
- (libraries core cstruct ixy)
+ (libraries ixy)
  (preprocess (pps ppx_cstruct))
  (ocamlopt_flags :standard -O3)
  (modules pktgen))

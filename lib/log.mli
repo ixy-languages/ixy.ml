@@ -1,5 +1,3 @@
-open Core
-
 type log_level =
   | STFU
   | ERROR
@@ -15,7 +13,7 @@ val color : bool ref
 (** Setting [color] to [false] will prevent colored output.
     Default: [true] *)
 
-val out_channel : Out_channel.t ref
+val out_channel : out_channel ref
 (** Setting [out_channel] to a specific channel will cause all functions to
     print to this channel.
     Default: [stdout] *)

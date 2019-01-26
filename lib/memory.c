@@ -1,5 +1,6 @@
 #include <inttypes.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 #define CAML_NAME_SPACE
 
@@ -8,6 +9,13 @@
 #include <caml/mlvalues.h>
 #include <caml/unixsupport.h>
 #include <caml/bigarray.h>
+
+CAMLprim value ixy_pagesize(value v_unit) {
+    CAMLparam1(v_unit);
+    CAMLlocal1(v_ps);
+    v_ps = Val_int(getpagesize());
+    CAMLreturn(v_ps);
+}
 
 CAMLprim value ixy_int64_of_addr(value v_buf, value v_off) {
     CAMLparam2(v_buf, v_off);

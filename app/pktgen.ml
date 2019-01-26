@@ -1,5 +1,3 @@
-open Core
-
 let packet_size = 60
 
 let batch_size = 64
@@ -93,9 +91,9 @@ let () =
     let bufs =
       Ixy.Memory.pkt_buf_alloc_batch mempool ~num_bufs:batch_size in
     Array.iter
-      bufs
-      ~f:(fun Ixy.Memory.{ data; _ } ->
-          Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
-          Int32.incr seq_num);
+      (fun Ixy.Memory.{ data; _ } ->
+         Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
+         seq_num := Int32.succ !seq_num)
+      bufs;
     Ixy.tx_batch_busy_wait dev 0 bufs
   done

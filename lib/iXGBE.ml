@@ -1,5 +1,3 @@
-open Core
-
 let default_mtu = 1518
 
 module EIMC = struct
@@ -33,7 +31,7 @@ module CTRL = struct
 
   let rst = 0x04000000l
 
-  let ctrl_rst_mask = Int32.(lnk_rst lor rst)
+  let ctrl_rst_mask = Int32.logor lnk_rst rst
 end
 
 module EEC = struct
@@ -55,15 +53,15 @@ module AUTOC = struct
 
   let lms_shift = 13
 
-  let lms_mask = Int32.(0x7l lsl lms_shift)
+  let lms_mask = Int32.shift_left 0x7l lms_shift
 
-  let lms_10G_serial = Int32.(0x3l lsl lms_shift)
+  let lms_10G_serial = Int32.shift_left 0x3l lms_shift
 
   let _10G_pma_pmd_mask = 0x00000180l
 
   let _10G_pma_pmd_shift = 7
 
-  let _10G_xaui = Int32.(0x0l lsl _10G_pma_pmd_shift)
+  let _10G_xaui = Int32.shift_left 0x0l _10G_pma_pmd_shift
 
   let an_restart = 0x00001000l
 end
@@ -99,7 +97,7 @@ module FCTRL = struct
 
   let upe = 0x00000200l (* Unicast Promiscuous Enable *)
 
-  let pe = Int32.(mpe lor upe) (* Promiscuous Enable *)
+  let pe = Int32.logor mpe upe (* Promiscuous Enable *)
 end
 
 module SRRCTL = struct
@@ -157,12 +155,12 @@ module LEDCTL = struct
   let mode_shift index = 8 * index
 
   let led_on old index =
-    let masked = Int32.(old land (lnot (mode_mask index))) in
-    Int32.(masked lor (0xEl lsl (mode_shift index)))
+    let masked = Int32.(logand old (lognot (mode_mask index))) in
+    Int32.(logor masked (shift_left 0xEl (mode_shift index)))
 
   let led_off old index =
-    let masked = Int32.(old land (lnot (mode_mask index))) in
-    Int32.(masked lor (0xFl lsl (mode_shift index)))
+    let masked = Int32.(logand old (lognot (mode_mask index))) in
+    Int32.(logor masked (shift_left 0xFl (mode_shift index)))
 end
 
 type register =
@@ -283,6 +281,7 @@ let register_to_int register =
   | RAH i -> 0x0A204 + (i * 8)
 
 let register_to_string register =
+  let open Printf in
   match register with
   | LINKS -> "LINKS"
   | EIMC -> "EIMC"
@@ -333,17 +332,17 @@ let set_reg hw register data =
   Cstruct.LE.set_uint32 hw (register_to_int register) data
 
 let set_flags hw register flags =
-  set_reg hw register Int32.((get_reg hw register) lor flags)
+  set_reg hw register (Int32.logor (get_reg hw register) flags)
 
 let clear_flags hw register flags =
-  set_reg hw register Int32.((get_reg hw register) land (lnot flags))
+  set_reg hw register Int32.(logand (get_reg hw register) (lognot flags))
 
 let wait_clear hw register mask =
-  while Int32.((get_reg hw register) land mask <> 0l) do
-    Util.wait 0.01
+  while (Int32.logand (get_reg hw register) mask <> 0l) do
+    Unix.sleepf 0.01
   done
 
 let wait_set hw register mask =
-  while Int32.((get_reg hw register) land mask <> mask) do
-    Util.wait 0.01
+  while (Int32.logand (get_reg hw register) mask <> mask) do
+    Unix.sleepf 0.01
   done

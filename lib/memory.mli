@@ -1,4 +1,4 @@
-val pagesize : unit -> int64
+val pagesize : unit -> int
 (** [pagesize ()] returns the size of a system page in bytes. *)
 
 type dma_memory = private {
