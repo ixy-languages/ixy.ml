@@ -16,7 +16,7 @@ if [ ! -d "~/.opam" ]; then
   opam switch 4.07.0 # Debian still uses opam 1.2.2
 fi
 
-opam install core ppx_cstruct -y
+opam install ppx_cstruct -y
 
 eval `opam config env`
 

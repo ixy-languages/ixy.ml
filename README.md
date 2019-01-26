@@ -69,10 +69,10 @@ ixy.ml also calls a few C functions ([`lib/memory.c`](./lib/memory.c) and [`lib/
 
 ### Dependencies
 
-You will need [`core`](https://github.com/janestreet/core) and [`ppx_cstruct`](https://github.com/mirage/ocaml-cstruct):
+You will need [`ppx_cstruct`](https://github.com/mirage/ocaml-cstruct):
 
 ```
-opam install core ppx_cstruct
+opam install ppx_cstruct
 ```
 
 ### Building and Installing
