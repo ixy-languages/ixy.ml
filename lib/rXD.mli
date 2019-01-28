@@ -8,13 +8,9 @@ val split : int -> Cstruct.t -> t array
 (** [split n cstruct] splits [cstruct] into [n] receive descriptors. *)
 
 val dd : t -> bool
-(** [dd rxd] returns [true] if [rxd]'s stat_dd bit is set,
-    i.e. the corresponding buffer has been filled with a packet by the NIC. *)
-
-val eop : t -> bool
-(** [eop rxd] returns [true] if [rxd]'s stat_eop bit is set,
-    i.e. the corresponding buffer has the contents of an entire packet.
-    We don't support jumbo frames (yet?). *)
+(** [dd rxd] returns [true] if [rxd]'s DD and EOP bits are set.
+    Fails if DD is set, but EOP is not set (jumbo frame).
+    Returns [false] otherwise. *)
 
 val size : t -> int
 (** [size rxd] returns [rxd]'s size in bytes. *)

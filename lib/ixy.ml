@@ -405,10 +405,7 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
     let rec loop offset =
       let rxd = descriptors.(wrap_rx (rxq.rx_index + offset)) in
       if offset < batch_size && RXD.dd rxd then
-        if not (RXD.eop rxd) then
-          error "jumbo frames are not supported"
-        else
-          loop (offset + 1)
+        loop (offset + 1)
       else
         offset in
     loop 0 in
