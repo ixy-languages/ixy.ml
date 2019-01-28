@@ -1,5 +1,5 @@
-val pagesize : unit -> int
-(** [pagesize ()] returns the size of a system page in bytes. *)
+val pagesize : int
+(** [pagesize] is the size of a system page in bytes. *)
 
 type dma_memory = private {
   virt : Cstruct.t; (** DMA memory wrapped in a Cstruct.t *)

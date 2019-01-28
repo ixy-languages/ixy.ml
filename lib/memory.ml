@@ -7,6 +7,8 @@ type dma_memory = {
 
 external pagesize : unit -> int = "ixy_pagesize"
 
+let pagesize = pagesize ()
+
 external ixy_int64_of_addr :
   Cstruct.buffer -> int -> Cstruct.uint64 = "ixy_int64_of_addr"
 
@@ -21,7 +23,6 @@ let mlock Cstruct.{ buffer; off; len } =
 let virt_to_phys virt =
   if Obj.is_int (Obj.repr virt) then
     raise (Invalid_argument "virt must be a pointer");
-  let pagesize = pagesize () in
   let fd = Unix.(openfile "/proc/self/pagemap" [O_RDONLY] 0o644) in
   let addr = int64_of_addr virt in
   let offset = (Int64.to_int addr) / pagesize * 8 in
