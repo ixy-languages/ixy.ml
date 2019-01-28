@@ -12,9 +12,7 @@
 
 CAMLprim value ixy_pagesize(value v_unit) {
     CAMLparam1(v_unit);
-    CAMLlocal1(v_ps);
-    v_ps = Val_int(getpagesize());
-    CAMLreturn(v_ps);
+    CAMLreturn(Val_int(getpagesize()));
 }
 
 CAMLprim value ixy_int64_of_addr(value v_buf, value v_off) {
