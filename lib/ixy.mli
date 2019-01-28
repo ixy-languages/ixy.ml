@@ -1,5 +1,5 @@
 val max_queues : int
-(** maximum number of queues *)
+(** Maximum number of queues. *)
 
 val max_rx_queue_entries : int
 (** Maximum number of receive queue entries. *)
@@ -13,21 +13,30 @@ val num_rx_queue_entries : int
 val num_tx_queue_entries : int
 (** Number of transmit queue entries. *)
 
-(* TODO delete after testing *)
-
 type rxq = private {
-  descriptors : RXD.t array; (** RX descriptor ring. *)
-  mempool : Memory.mempool; (** [mempool] from which to allocate receive buffers. *)
-  mutable rx_index : int; (** Descriptor ring tail pointer. *)
-  pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. *)
+  descriptors : RXD.t array;
+  (** RX descriptor ring. *)
+  mempool : Memory.mempool;
+  (** [mempool] from which to allocate receive buffers. *)
+  mutable rx_index : int;
+  (** Descriptor ring tail pointer. *)
+  pkt_bufs : Memory.pkt_buf array
+  (** [pkt_bufs.(i)] contains the buffer corresponding to
+      [descriptors.(i)] for [0] <= [i] < [num_entries]. *)
 }
 (** Type of a receive queue. *)
 
 type txq = private {
-  descriptors : TXD.t array; (** TX descriptor ring. *)
-  mutable clean_index : int; (** Pointer to first unclean descriptor. *)
-  mutable tx_index : int; (** Descriptor ring tail pointer. *)
-  pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. Initially filled with [Memory.dummy]. *)
+  descriptors : TXD.t array;
+  (** TX descriptor ring. *)
+  mutable clean_index : int;
+  (** Pointer to first unclean descriptor. *)
+  mutable tx_index : int;
+  (** Descriptor ring tail pointer. *)
+  pkt_bufs : Memory.pkt_buf array
+  (** [pkt_bufs.(i)] contains the buffer corresponding to
+      [descriptors.(i)] for [0] <= [i] < [num_entries].
+      Initially filled with [Memory.dummy]. *)
 }
 (** Type of a transmit queue. *)
 
@@ -60,7 +69,7 @@ val create : pci_addr:PCI.t -> rxq:int -> txq:int -> t
     with [rxq] receive queues and [txq] transmit queues. *)
 
 val shutdown : t -> unit
-(** [shutdown dev] disables all rx and tx queues on [dev] and resets the device.
+(** [shutdown dev] disables [dev]'s rx and tx queues and resets the device.
     The device must not be used afterwards. *)
 
 val get_mac : t -> Cstruct.t
@@ -89,7 +98,7 @@ val get_stats : t -> stats
     on [dev] since initialization or the last call to [reset_stats]. *)
 
 val rx_batch : ?batch_size:int -> t -> int -> Memory.pkt_buf array
-(** [rx_batch dev queue] attempts to receive packets from [dev]'s queue [queue].
+(** [rx_batch dev queue] receives packets from [dev]'s queue [queue].
     Returns between [0] and [num_rx_queue_entries] packets.
     If [batch_size] is specified then between [0] and [batch_size] packets
     will be returned. *)
@@ -103,7 +112,8 @@ val tx_batch_busy_wait : t -> int -> Memory.pkt_buf array -> unit
     have been transmitted on [dev]'s queue [queue] by repeatedly calling
     [tx_batch]. *)
 
-val check_link : t -> [ `SPEED_10G | `SPEED_1G | `SPEED_100 | `SPEED_UNKNOWN ] * bool
+val check_link :
+  t -> [ `SPEED_10G | `SPEED_1G | `SPEED_100 | `SPEED_UNKNOWN ] * bool
 (** [check_link dev] returns [dev]'s autoconfigured speed and wether
     or not the link is up. *)
 

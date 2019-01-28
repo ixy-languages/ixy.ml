@@ -21,17 +21,17 @@ let num_tx_queue_entries = 512
 let tx_clean_batch = 32
 
 type rxq = {
-  descriptors : RXD.t array; (** RX descriptor ring. *)
-  mempool : Memory.mempool; (** [mempool] from which to allocate receive buffers. *)
-  mutable rx_index : int; (** Descriptor ring tail pointer. *)
-  pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. *)
+  descriptors : RXD.t array;
+  mempool : Memory.mempool;
+  mutable rx_index : int;
+  pkt_bufs : Memory.pkt_buf array
 }
 
 type txq = {
-  descriptors : TXD.t array; (** TX descriptor ring. *)
-  mutable clean_index : int; (** Pointer to first unclean descriptor. *)
-  mutable tx_index : int; (** Descriptor ring tail pointer. *)
-  pkt_bufs : Memory.pkt_buf array; (** [pkt_bufs.(i)] contains the buffer corresponding to [descriptors.(i)] for [0] <= [i] < [num_entries]. Initially filled with [Memory.dummy]. *)
+  descriptors : TXD.t array;
+  mutable clean_index : int;
+  mutable tx_index : int;
+  pkt_bufs : Memory.pkt_buf array
 }
 
 type register_access = {

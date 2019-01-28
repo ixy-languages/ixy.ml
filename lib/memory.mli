@@ -2,8 +2,10 @@ val pagesize : int
 (** [pagesize] is the size of a system page in bytes. *)
 
 type dma_memory = private {
-  virt : Cstruct.t; (** DMA memory wrapped in a Cstruct.t *)
-  phys : Cstruct.uint64 (** physical address of the beginning of the DMA memory buffer *)
+  virt : Cstruct.t;
+  (** DMA memory wrapped in a Cstruct.t *)
+  phys : Cstruct.uint64
+  (** physical address of the beginning of the DMA memory buffer *)
 }
 (** Type of allocated DMA-ready memory. *)
 
@@ -20,19 +22,24 @@ type mempool
 (** Type of a memory pool. *)
 
 val allocate_mempool : ?pre_fill:Cstruct.t -> num_entries:int -> mempool
-(** [allocate_mempool ?pre_fill:data ~num_entries:n] allocates a mempool with
-    [n] packet buffers. If [pre_fill] is provided, the packet buffers will be
-    initialized with [data] and their length will be set to [pre_fill]'s length.
-    Otherwise the [pkt_buf]s are zeroed and their initial size will be set to [2048]. *)
+(** [allocate_mempool ?pre_fill:data ~num_entries:n] allocates a mempool
+    with [n] packet buffers. If [pre_fill] is provided, the packet buffers
+    will be initialized with [data] and their length will be set to
+    [pre_fill]'s length. Otherwise the [pkt_buf]s are zeroed and their initial
+    size will be set to [2048]. *)
 
 val num_free_bufs : mempool -> int
 (** [num_free_bufs mempool] returns the number of free buffer's in [mempool]. *)
 
 type pkt_buf = private {
   phys : Cstruct.uint64;
+  (** Physical address of the [data] field's underlying [Cstruct.buffer]. *)
   mempool : mempool;
+  (** Mempool this packet belongs to. *)
   mutable size : int;
+  (** Actual size of the payload within the [data] field. *)
   data : Cstruct.t
+  (** Packet payload; always 2048 bytes in size. *)
 }
 (** Type of a packet buffer. *)
 
