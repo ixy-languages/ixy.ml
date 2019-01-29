@@ -38,7 +38,7 @@ let virt_to_phys virt =
   let offset =
     let x = Int64.rem addr pagesize in
     if x < 0L then Int64.add x pagesize else x in
-  Int64.(add (mul (logand phys 0x7f_ffff_ffff_ffffL) pagesize) offset)
+  Int64.(add (mul (logand phys 0x7F_FFFF_FFFF_FFFFL) pagesize) offset)
 
 let huge_page_id = ref 0
 
@@ -132,36 +132,36 @@ let allocate_mempool ?pre_fill ~num_entries =
     mempool.free_bufs;
   mempool
 
-let num_free_bufs { free; _ } = free
+let num_free_bufs mempool = mempool.free
 
-let pkt_buf_alloc_batch ({ num_entries; free; free_bufs; _ } as mempool) ~num_bufs =
-  if num_bufs > num_entries then
+let pkt_buf_alloc_batch mempool ~num_bufs =
+  if num_bufs > mempool.num_entries then
     warn
       "can never allocate %d bufs in a mempool with %d bufs"
       num_bufs
-      num_entries;
-  let n = min num_bufs free in
-  let alloc_start = free - n in
-  let bufs = Array.sub free_bufs alloc_start n in
+      mempool.num_entries;
+  let n = min num_bufs mempool.free in
+  let alloc_start = mempool.free - n in
+  let bufs = Array.sub mempool.free_bufs alloc_start n in
   mempool.free <- alloc_start;
   bufs
 
-let pkt_buf_alloc ({ free; free_bufs; _ } as mempool) =
+let pkt_buf_alloc mempool =
   (* doing "pkt_buf_alloc_batch mempool ~num_bufs:1" has a bit more overhead *)
-  if free > 0 then
-    let index = free - 1 in
+  if mempool.free > 0 then
+    let index = mempool.free - 1 in
     mempool.free <- index;
-    Some free_bufs.(index)
+    Some mempool.free_bufs.(index)
   else
     None
 
-let pkt_buf_free ({ mempool = ({ free; free_bufs; _ } as mempool); _ } as buf) =
-  free_bufs.(free) <- buf;
-  mempool.free <- free + 1
+let pkt_buf_free ({ mempool; _ } as buf) =
+  mempool.free_bufs.(mempool.free) <- buf;
+  mempool.free <- mempool.free + 1
 
-let pkt_buf_resize ({ mempool = { entry_size; _ }; _ } as buf) ~size =
+let pkt_buf_resize ({ mempool; _ } as buf) ~size =
   (* MTU is fixed at 1518 by default. *)
-  let upper = min entry_size IXGBE.default_mtu in
+  let upper = min mempool.entry_size IXGBE.default_mtu in
   if size > 0 && size <= upper then
     buf.size <- size
   else

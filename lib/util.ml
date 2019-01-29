@@ -2,7 +2,7 @@ let split i64 =
   (Obj.magic (Int64.logand i64 0xFFFFFFFFL) : int32),
   (Obj.magic (Int64.shift_right_logical i64 32) : int32)
 
-(* we need our own version of 'Unix_cstruct.of_fd' to map the file as shared. *)
+(* 'Unix_cstruct.of_fd' doesn't map the file as shared. *)
 let mmap fd =
   let genarray =
     Bigarray.(Unix.map_file fd char c_layout true [|-1|]) in

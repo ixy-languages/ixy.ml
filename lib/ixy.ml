@@ -86,11 +86,15 @@ let init_link ra =
   let autoc = ra.get_reg IXGBE.AUTOC in
   ra.set_reg
     IXGBE.AUTOC
-    Int32.(logor (logand autoc (lognot IXGBE.AUTOC.lms_mask)) IXGBE.AUTOC.lms_10G_serial);
+    Int32.(logor
+             (logand autoc (lognot IXGBE.AUTOC.lms_mask))
+             IXGBE.AUTOC.lms_10G_serial);
   let autoc = ra.get_reg IXGBE.AUTOC in
   ra.set_reg
     IXGBE.AUTOC
-    Int32.(logor (logand autoc (lognot IXGBE.AUTOC._10G_pma_pmd_mask)) IXGBE.AUTOC._10G_xaui);
+    Int32.(logor
+             (logand autoc (lognot IXGBE.AUTOC._10G_pma_pmd_mask))
+             IXGBE.AUTOC._10G_xaui);
   ra.set_flags IXGBE.AUTOC IXGBE.AUTOC.an_restart
 
 let init_rx ra n =
@@ -113,7 +117,9 @@ let init_rx ra n =
       let srrctl = ra.get_reg (IXGBE.SRRCTL i) in
       ra.set_reg
         (IXGBE.SRRCTL i)
-        Int32.(logor (logand srrctl (lognot IXGBE.SRRCTL.desctype_mask)) IXGBE.SRRCTL.desctype_adv_onebuf);
+        Int32.(logor
+                 (logand srrctl (lognot IXGBE.SRRCTL.desctype_mask))
+                 IXGBE.SRRCTL.desctype_adv_onebuf);
       (* drop packets if no rx descriptors available *)
       ra.set_flags (IXGBE.SRRCTL i) IXGBE.SRRCTL.drop_en;
       (* setup descriptor ring *)
@@ -183,7 +189,9 @@ let start_rx t i =
 let init_tx ra n =
   if n > 0 then begin
     (* enable crc offload and small packet padding *)
-    ra.set_flags IXGBE.HLREG0 Int32.(logor IXGBE.HLREG0.txcrcen IXGBE.HLREG0.txpaden);
+    ra.set_flags
+      IXGBE.HLREG0
+      Int32.(logor IXGBE.HLREG0.txcrcen IXGBE.HLREG0.txpaden);
     ra.set_reg (IXGBE.TXPBSIZE 0) IXGBE.TXPBSIZE._40KB;
     for i = 1 to 7 do
       ra.set_reg (IXGBE.TXPBSIZE i) 0l
@@ -328,13 +336,24 @@ let create ~pci_addr ~rxq ~txq =
   begin match class_code, subclass, prog_if, vendor with
     | 0x2, 0x0, 0x0, v when v = PCI.vendor_intel -> ()
     | 0x1, 0x0, 0x0, v when v = PCI.vendor_intel ->
-      error "device %s is configured as SCSI storage device in EEPROM" pci_addr_str
+      error
+        "device %s is configured as SCSI storage device in EEPROM"
+        pci_addr_str
     | 0x2, 0x0, _, v when v <> PCI.vendor_intel ->
-      error "device %s is a non-Intel NIC (vendor: %#x)" pci_addr_str vendor
+      error
+        "device %s is a non-Intel NIC (vendor: %#x)"
+        pci_addr_str
+        vendor
     | 0x2, _, _, _ ->
-      error "device %s is not an Ethernet NIC (subclass: %#x)" pci_addr_str subclass
+      error
+        "device %s is not an Ethernet NIC (subclass: %#x)"
+        pci_addr_str
+        subclass
     | _ ->
-      error "device %s is not a NIC (class: %#x)" pci_addr_str class_code
+      error
+        "device %s is not a NIC (class: %#x)"
+        pci_addr_str
+        class_code
   end;
   info "device %s has device id %#x" pci_addr_str device_id;
   let hw =
