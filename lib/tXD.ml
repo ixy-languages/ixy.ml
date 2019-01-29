@@ -16,7 +16,8 @@ type t = Cstruct.t
   type adv_tx_wb = {
     rsvd : uint64;
     nxtseq_seed : uint32;
-    status : uint32
+    status : uint16; (* Cstruct.uint16 is unboxed and therefore faster *)
+    more_rsvd : uint16
   } [@@little_endian]
 ]
 
@@ -25,8 +26,8 @@ let () = assert (sizeof_adv_tx_wb = sizeof_adv_tx_read)
 let sizeof = sizeof_adv_tx_wb
 
 let dd t =
-  let stat_dd = 0b1l in
-  Int32.logand (get_adv_tx_wb_status t) stat_dd <> 0l
+  let stat_dd = 0b1 in
+  (get_adv_tx_wb_status t) land stat_dd <> 0
 
 let split num cs =
   let len = Cstruct.len cs in

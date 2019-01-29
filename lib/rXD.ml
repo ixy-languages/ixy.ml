@@ -17,7 +17,8 @@ type t = Cstruct.t
     hdr_info : uint16;
     ip_id : uint16;
     csum : uint16;
-    status_error : uint32;
+    status : uint16; (* Cstruct.uint16 is unboxed and therefore faster *)
+    error : uint16;
     length : uint16;
     vlan : uint16
   } [@@little_endian]
@@ -28,10 +29,11 @@ let () = assert (sizeof_adv_rxd_wb = sizeof_adv_rxd_read)
 let sizeof = sizeof_adv_rxd_wb
 
 let dd t =
-  let status = get_adv_rxd_wb_status_error t in
-  match Int32.logand status 0b11l with (* check stat_dd and stat_eop *)
-  | 0b11l -> true
-  | 0b01l -> error "jumbo frames are not supported"
+  let status = get_adv_rxd_wb_status t in
+  let stat_dd, stat_eop = 0b01, 0b10 in
+  match status land (stat_dd lor stat_eop) with
+  | 0b11 -> true
+  | 0b01 -> error "jumbo frames are not supported"
   | _ -> false
 
 let size t = get_adv_rxd_wb_length t
