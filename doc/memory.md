@@ -39,7 +39,7 @@ ixy stores buffer metadata in front of the packet data like so:
 buf
 ```
 
-The actual implementation is `struct pkt_buf` in [`ixy/src/memory.h`](https://github.com/emmericp/ixy/blob/master/src/memory.h).
+The actual implementation is `struct pkt_buf` in [`ixy/src/memory.h`](https://github.com/emmericp/ixy/blob/bf4daff9adf1c5165a6d664678f3b7dd69b5640e/src/memory.h).
 
 ```c
 struct pkt_buf {
@@ -393,4 +393,4 @@ Only before the first packet has been transmitted will `tx_index` and `clean_ind
 
 After at least `num_tx_queue_entries` packets have been sent, `pkt_bufs.(i)` contains the `pkt_buf` described by the tx descriptor in `descriptors.(i)`.
 Before that `pkt_bufs` will be filled with dummy buffers (that **must not be freed**) and `descriptors` will be filled with descriptors pointing to `0xffffffffffffffff`.
-`0xffffffffffffffff` is used instead of `0` to cause rogue writes to trigger a DMA error instead of actually writing to physical memory (see [Snabb's implementation](https://github.com/snabbco/snabb/blob/master/src/apps/intel/intel10g.lua#L169)).
+`0xffffffffffffffff` is used instead of `0` to cause rogue writes to trigger a DMA error instead of actually writing to physical memory (see [Snabb's implementation](https://github.com/snabbco/snabb/blob/771b55c829f42a1a788002c2924c6d7047cd1568/src/apps/intel/intel10g.lua#L169)).
