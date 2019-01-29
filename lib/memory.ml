@@ -94,7 +94,7 @@ let dummy =
       free = 0;
       free_bufs = [||] (* ensure out of bounds write when freed *)
     } in
-  { phys = 0L;
+  { phys = 0xFFFF_FFFF_FFFF_FFFFL; (* ensure DMA error on access *)
     mempool = dummy_pool;
     size = 0;
     data = Cstruct.empty
