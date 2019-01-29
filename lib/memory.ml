@@ -5,7 +5,7 @@ type dma_memory = {
   phys : Cstruct.uint64
 }
 
-external pagesize : unit -> int = "ixy_pagesize"
+external pagesize : unit -> int = "ixy_pagesize" [@@noalloc]
 
 let pagesize = pagesize ()
 
@@ -15,7 +15,8 @@ external ixy_int64_of_addr :
 let int64_of_addr Cstruct.{ buffer; off; _ } =
   ixy_int64_of_addr buffer off
 
-external ixy_mlock : Cstruct.buffer -> int -> int -> unit = "ixy_mlock"
+external ixy_mlock :
+  Cstruct.buffer -> int -> int -> unit = "ixy_mlock" [@@noalloc]
 
 let mlock Cstruct.{ buffer; off; len } =
   ixy_mlock buffer off len
