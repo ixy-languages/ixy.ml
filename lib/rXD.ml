@@ -29,11 +29,9 @@ let sizeof = sizeof_adv_rxd_wb
 
 let dd t =
   let status = get_adv_rxd_wb_status_error t in
-  let stat_dd = 0b01l in
-  let stat_eop = 0b10l in
-  match Int32.(logand status stat_dd <> 0l, logand status stat_eop <> 0l) with
-  | true, true -> true
-  | true, false -> error "jumbo frames are not supported"
+  match Int32.logand status 0b11l with (* check stat_dd and stat_eop *)
+  | 0b11l -> true
+  | 0b01l -> error "jumbo frames are not supported"
   | _ -> false
 
 let size t = get_adv_rxd_wb_length t
