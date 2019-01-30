@@ -1,10 +1,10 @@
 let forward batch_size rx_dev tx_dev =
   let rx = Ixy.rx_batch ?batch_size rx_dev 0 in
   (* touch all received packets *)
-  Array.iter
-    Ixy.Memory.(fun pkt ->
-        Cstruct.(set_uint8 pkt.data 48 (1 + get_uint8 pkt.data 48)))
-    rx;
+  for i = 0 to Array.length rx - 1 do
+    let data = rx.(i).Ixy.Memory.data in
+    Cstruct.(set_uint8 data 48 (1 + get_uint8 data 48))
+  done;
   Ixy.tx_batch tx_dev 0 rx
   (* free packets that cannot be sent immediately *)
   |> Array.iter Ixy.Memory.pkt_buf_free
