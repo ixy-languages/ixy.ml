@@ -13,6 +13,51 @@ val num_rx_queue_entries : int
 val num_tx_queue_entries : int
 (** Number of transmit queue entries. *)
 
+module RXD : sig
+  type t
+  (** Type of receive descriptors. *)
+
+  val sizeof : int
+  (** [sizeof] is the size of a receive descriptor in bytes. Equal to 16. *)
+
+  val split : int -> Cstruct.t -> t array
+  (** [split n cstruct] splits [cstruct] into [n] receive descriptors. *)
+
+  val dd : t -> bool
+  (** [dd rxd] returns [true] if [rxd]'s DD and EOP bits are set.
+      Fails if DD is set, but EOP is not set (jumbo frame).
+      Returns [false] otherwise. *)
+
+  val size : t -> int
+  (** [size rxd] returns [rxd]'s size in bytes. *)
+
+  val reset : t -> Memory.pkt_buf -> unit
+  (** [reset rxd buf] resets [rxd] by resetting its flags and pointing
+      it to the buffer [buf]. *)
+end
+(** Receive descriptor handling. *)
+
+module TXD : sig
+  type t
+  (** Type of transmit descriptors. *)
+
+  val sizeof : int
+  (** [sizeof] is the size of a transmit descriptor in bytes. Equal to 16. *)
+
+  val split : int -> Cstruct.t -> t array
+  (** [split n cstruct] splits [cstruct] into [n] transmit descriptors. *)
+
+  val dd : t -> bool
+  (** [dd txd] returns true if [txd]'s stat_dd bit is set,
+      i.e. the packet that has been placed in the corresponding
+      buffer was sent out by the NIC. *)
+
+  val reset : t -> Memory.pkt_buf -> unit
+  (** [reset txd buf] resets [txd] by resetting its flags and pointing
+      it to the buffer [buf]. *)
+end
+(** Transmit descriptor handling. *)
+
 type rxq = private {
   descriptors : RXD.t array;
   (** RX descriptor ring. *)
