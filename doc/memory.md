@@ -128,7 +128,7 @@ union ixgbe_adv_rx_desc {
 
 `ixgbe_adv_rx_desc.read` is the read format; `ixgbe_adv_rx_desc.wb` is the write-back format.
 
-### Read Format
+### RX Read Format
 
 The read format consists of two fields, each one word in size.
 The driver writes the physical address of the packet buffer that is being described to the first word.
@@ -147,7 +147,7 @@ The read format accessors are generated from the following ppx_cstruct definitio
 ]
 ```
 
-### Write-Back Format
+### RX Write-Back Format
 
 After receiving a packet the NIC updates the rx descriptor to notify the driver.
 It uses the write-back format.
@@ -166,12 +166,15 @@ The write-back format accessors are generated from the following ppx_cstruct def
     hdr_info : uint16;
     ip_id : uint16;
     csum : uint16;
-    status_error : uint32;
+    status : uint16;
+    error : uint16;
     length : uint16;
     vlan : uint16
   } [@@little_endian]
 ]
 ```
+
+This doesn't match the C definition exactly: the 32-bit `status_error` field is split up into two 16-bit fields. This is to improve performance: `Cstruct.uint32` (internally represented as an OCaml `int32`) is stored in a boxed representation which is slower to access than `Cstruct.uint16` (represented as an unboxed OCaml `int`).
 
 ## Transmit Descriptors (tx descriptors)
 
@@ -199,7 +202,7 @@ union ixgbe_adv_tx_desc {
 
 Yet again `ixgbe_adv_tx_desc.read` is the read format; `ixgbe_adv_tx_desc.wb` is the write-back format.
 
-### Read Format
+### TX Read Format
 
 The read format contains the physical address of a packet buffer that is to be transmitted.
 Additionally there are a number of flags that need to be set.
@@ -217,7 +220,7 @@ The read format accessors are generated from the following ppx_cstruct definitio
 ]
 ```
 
-### Write-back Format
+### TX Write-back Format
 
 The write-back format consists almost entirely of reserved bits (according to the datasheet).
 The only actual flag is the `DD` flag.
@@ -231,10 +234,13 @@ The write-back format accessors are generated from the following ppx_cstruct def
   type adv_tx_wb = {
     rsvd : uint64;
     nxtseq_seed : uint32;
-    status : uint32
+    status : uint16;
+    more_rsvd : uint16
   } [@@little_endian]
 ]
 ```
+
+[Like `adv_rx_wb`](#rx-write-back-format) the `status` field is also split into two 16-bit fields.
 
 ## Descriptor Ring
 
@@ -300,6 +306,7 @@ The user program periodically calls `rx_batch` to receive a batch of packets.
 `rx_batch` walks the descriptor ring and checks every descriptor's `DD` bit.
 If this bit is set, we know that the NIC has placed a packet in the buffer the descriptor points to.
 Once we have reached a descriptor whose `DD` bit isn't set, we have reached the first empty descriptor, i.e. the head.
+If we have a limited batch size we can just stop reading descriptors whenever we have enough.
 
 Now we can receive all packets between tail and head.
 To prepare the packet for the user program we need to set its size.
