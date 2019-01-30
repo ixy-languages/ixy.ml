@@ -538,7 +538,7 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
     let receive offset =
       let index = wrap_rx (rxq.rx_index + offset) in
       let buf, rxd = rx_bufs.(index), rxds.(index) in
-      Memory.pkt_buf_resize buf ~size:(RXD.size rxd);
+      buf.Memory.size <- RXD.size rxd;
       let new_buf = empty_bufs.(offset) in
       RXD.reset rxd new_buf;
       rx_bufs.(index) <- new_buf;

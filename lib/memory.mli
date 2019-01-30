@@ -31,7 +31,7 @@ val allocate_mempool : ?pre_fill:Cstruct.t -> num_entries:int -> mempool
 val num_free_bufs : mempool -> int
 (** [num_free_bufs mempool] returns the number of free buffers in [mempool]. *)
 
-type pkt_buf = private {
+type pkt_buf = { (* not private so Ixy.rx_batch can write size directly *)
   phys : Cstruct.uint64;
   (** Physical address of the [data] field's underlying [Cstruct.buffer]. *)
   mempool : mempool;
