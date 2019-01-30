@@ -3,7 +3,8 @@
  (public_name ixy-echo)
  (modes native)
  (libraries ixy)
- (ocamlopt_flags :standard -O3)
+ (flags :standard -w A-42-44)
+ (ocamlopt_flags -O3)
  (modules echo))
 
 (executable
@@ -11,7 +12,8 @@
  (public_name ixy-fwd)
  (modes native)
  (libraries ixy)
- (ocamlopt_flags :standard -O3)
+ (flags :standard -w A-42-44)
+ (ocamlopt_flags -O3)
  (modules fwd))
 
 (executable
@@ -20,5 +22,6 @@
  (modes native)
  (libraries ixy)
  (preprocess (pps ppx_cstruct))
- (ocamlopt_flags :standard -O3)
+ (flags :standard -w A-42-44)
+ (ocamlopt_flags -O3)
  (modules pktgen))

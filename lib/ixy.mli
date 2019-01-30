@@ -59,26 +59,26 @@ end
 (** Transmit descriptor handling. *)
 
 type rxq = private {
-  descriptors : RXD.t array;
+  rxds : RXD.t array;
   (** RX descriptor ring. *)
   mempool : Memory.mempool;
   (** [mempool] from which to allocate receive buffers. *)
   mutable rx_index : int;
   (** Descriptor ring tail pointer. *)
-  pkt_bufs : Memory.pkt_buf array
+  rx_bufs : Memory.pkt_buf array
   (** [pkt_bufs.(i)] contains the buffer corresponding to
       [descriptors.(i)] for [0] <= [i] < [num_entries]. *)
 }
 (** Type of a receive queue. *)
 
 type txq = private {
-  descriptors : TXD.t array;
+  txds : TXD.t array;
   (** TX descriptor ring. *)
   mutable clean_index : int;
   (** Pointer to first unclean descriptor. *)
   mutable tx_index : int;
   (** Descriptor ring tail pointer. *)
-  pkt_bufs : Memory.pkt_buf array
+  tx_bufs : Memory.pkt_buf array
   (** [pkt_bufs.(i)] contains the buffer corresponding to
       [descriptors.(i)] for [0] <= [i] < [num_entries].
       Initially filled with [Memory.dummy]. *)
@@ -95,6 +95,14 @@ type register_access = private {
 }
 (** Type of register access function set. *)
 
+type stats = private {
+  mutable rx_pkts : int;
+  mutable tx_pkts : int;
+  mutable rx_bytes : int;
+  mutable tx_bytes : int
+}
+(** Type of statistics. *)
+
 type t = private {
   pci_addr : string;
   num_rxq : int;
@@ -102,10 +110,7 @@ type t = private {
   num_txq : int;
   txqs : txq array;
   ra : register_access;
-  mutable rx_pkts : int;
-  mutable tx_pkts : int;
-  mutable rx_bytes : int;
-  mutable tx_bytes : int
+  stats : stats
 }
 (** Type of an ixgbe NIC. *)
 
@@ -125,14 +130,6 @@ val set_promisc : t -> bool -> unit
     [set_promisc dev false] disables promiscuous mode on [dev].
     In promisuous mode all packets received by the NIC are
     forwarded to the driver, regardless of MAC address. *)
-
-type stats = private {
-  rx_pkts : int;
-  tx_pkts : int;
-  rx_bytes : int;
-  tx_bytes : int
-}
-(** Type of statistics. *)
 
 val reset_stats : t -> unit
 (** [reset_stats dev] resets packet and byte counters on [dev].

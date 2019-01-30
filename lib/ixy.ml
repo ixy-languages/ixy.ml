@@ -131,17 +131,17 @@ module TXD = struct
 end
 
 type rxq = {
-  descriptors : RXD.t array;
+  rxds : RXD.t array;
   mempool : Memory.mempool;
   mutable rx_index : int;
-  pkt_bufs : Memory.pkt_buf array
+  rx_bufs : Memory.pkt_buf array
 }
 
 type txq = {
-  descriptors : TXD.t array;
+  txds : TXD.t array;
   mutable clean_index : int;
   mutable tx_index : int;
-  pkt_bufs : Memory.pkt_buf array
+  tx_bufs : Memory.pkt_buf array
 }
 
 type register_access = {
@@ -154,10 +154,10 @@ type register_access = {
 }
 
 type stats = {
-  rx_pkts : int;
-  tx_pkts : int;
-  rx_bytes : int;
-  tx_bytes : int
+  mutable rx_pkts : int;
+  mutable tx_pkts : int;
+  mutable rx_bytes : int;
+  mutable tx_bytes : int
 }
 
 type t = {
@@ -167,10 +167,7 @@ type t = {
   num_txq : int;
   txqs : txq array;
   ra : register_access;
-  mutable rx_pkts : int;
-  mutable tx_pkts : int;
-  mutable rx_bytes : int;
-  mutable tx_bytes : int
+  stats : stats
 }
 
 let () =
@@ -238,18 +235,18 @@ let init_rx ra n =
       let descriptor_ring =
         Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
       (* set all descriptor bytes to 0xFF to prevent memory problems *)
-      Cstruct.memset descriptor_ring.virt 0xFF;
-      let descriptors =
+      Cstruct.memset descriptor_ring.Memory.virt 0xFF;
+      let rxds =
         RXD.split
           num_rx_queue_entries
-          descriptor_ring.virt in
+          descriptor_ring.Memory.virt in
       (* set base address *)
-      let lo, hi = Util.split descriptor_ring.phys in
+      let lo, hi = Util.split descriptor_ring.Memory.physical in
       ra.set_reg (IXGBE.RDBAL i) lo;
       ra.set_reg (IXGBE.RDBAH i) hi;
       (* set ring length *)
       ra.set_reg (IXGBE.RDLEN i) (Int32.of_int ring_size_bytes);
-      debug "rx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
+      debug "rx ring %d phy addr: %#018Lx" i descriptor_ring.Memory.physical;
       (* ring head = ring tail = 0
        * -> ring is empty
        * -> NIC won't write packets until we start the queue *)
@@ -260,14 +257,14 @@ let init_rx ra n =
         Memory.allocate_mempool
           ?pre_fill:None
           ~num_entries:(max mempool_size 4096) in
-      let pkt_bufs =
+      let rx_bufs =
         Memory.pkt_buf_alloc_batch
           mempool
           ~num_bufs:num_rx_queue_entries in
-      { descriptors;
+      { rxds;
         mempool;
         rx_index = 0;
-        pkt_bufs
+        rx_bufs
       } in
     let rxqs = Array.init n init_rxq in
     (* disable no snoop *)
@@ -289,8 +286,8 @@ let start_rx t i =
   (* reset all descriptors *)
   Array.iter2
     RXD.reset
-    rxq.descriptors
-    rxq.pkt_bufs;
+    rxq.rxds
+    rxq.rx_bufs;
   t.ra.set_flags (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
   t.ra.wait_set (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
   t.ra.set_reg (IXGBE.RDH i) 0l; (* should already be 0l? *)
@@ -314,14 +311,14 @@ let init_tx ra n =
         TXD.sizeof * num_tx_queue_entries in
       let descriptor_ring =
         Memory.allocate_dma ~require_contiguous:true ring_size_bytes in
-      Cstruct.memset descriptor_ring.virt 0xff;
+      Cstruct.memset descriptor_ring.Memory.virt 0xff;
       (* set base address *)
-      let lo, hi = Util.split descriptor_ring.phys in
+      let lo, hi = Util.split descriptor_ring.Memory.physical in
       ra.set_reg (IXGBE.TDBAL i) lo;
       ra.set_reg (IXGBE.TDBAH i) hi;
       (* set ring length *)
       ra.set_reg (IXGBE.TDLEN i) (Int32.of_int ring_size_bytes);
-      debug "tx ring %d phy addr: %#018Lx" i descriptor_ring.phys;
+      debug "tx ring %d phy addr: %#018Lx" i descriptor_ring.Memory.physical;
       let txdctl_old =
         ra.get_reg (IXGBE.TXDCTL i) in
       let txdctl_magic_bits =
@@ -340,16 +337,16 @@ let init_tx ra n =
                 (shift_left 8l 8)
                 (shift_left 4l 16))) in
       ra.set_reg (IXGBE.TXDCTL i) txdctl_magic_bits;
-      let descriptors =
+      let txds =
         TXD.split
           num_tx_queue_entries
-          descriptor_ring.virt in
-      let pkt_bufs =
+          descriptor_ring.Memory.virt in
+      let tx_bufs =
         Array.make num_tx_queue_entries Memory.dummy in
-      { descriptors;
+      { txds;
         clean_index = 0;
         tx_index = 0;
-        pkt_bufs;
+        tx_bufs;
       } in
     let txqs = Array.init n init_txq in
     ra.set_reg IXGBE.DMATXCTL IXGBE.DMATXCTL.te;
@@ -402,21 +399,18 @@ let wait_for_link t =
   loop max_wait
 
 let get_stats t =
-  t.rx_pkts <- t.rx_pkts + Int32.to_int (t.ra.get_reg IXGBE.GPRC);
-  t.tx_pkts <- t.tx_pkts + Int32.to_int (t.ra.get_reg IXGBE.GPTC);
+  let { stats; ra; _ } = t in
+  stats.rx_pkts <- stats.rx_pkts + Int32.to_int (ra.get_reg IXGBE.GPRC);
+  stats.tx_pkts <- stats.tx_pkts + Int32.to_int (ra.get_reg IXGBE.GPTC);
   let new_rx_bytes =
-    Int32.to_int (t.ra.get_reg IXGBE.GORCL)
-    + (Int32.to_int (t.ra.get_reg IXGBE.GORCH) lsl 32) in
-  t.rx_bytes <- t.rx_bytes + new_rx_bytes;
+    Int32.to_int (ra.get_reg IXGBE.GORCL)
+    + (Int32.to_int (ra.get_reg IXGBE.GORCH) lsl 32) in
+  stats.rx_bytes <- stats.rx_bytes + new_rx_bytes;
   let new_tx_bytes =
-    Int32.to_int (t.ra.get_reg IXGBE.GOTCL)
-    + (Int32.to_int (t.ra.get_reg IXGBE.GOTCH) lsl 32) in
-  t.tx_bytes <- t.tx_bytes + new_tx_bytes;
-  { rx_pkts = t.rx_pkts;
-    tx_pkts = t.tx_pkts;
-    rx_bytes = t.rx_bytes;
-    tx_bytes = t.tx_bytes
-  }
+    Int32.to_int (ra.get_reg IXGBE.GOTCL)
+    + (Int32.to_int (ra.get_reg IXGBE.GOTCH) lsl 32) in
+  stats.tx_bytes <- stats.tx_bytes + new_tx_bytes;
+  stats
 
 let get_mac t =
   let mac = Cstruct.create 6 in
@@ -428,10 +422,11 @@ let get_mac t =
 
 let reset_stats t =
   ignore @@ get_stats t;
-  t.rx_pkts <- 0;
-  t.tx_pkts <- 0;
-  t.rx_bytes <- 0;
-  t.tx_bytes <- 0
+  let stats = t.stats in
+  stats.rx_pkts <- 0;
+  stats.tx_pkts <- 0;
+  stats.rx_bytes <- 0;
+  stats.tx_bytes <- 0
 
 let create ~pci_addr ~rxq ~txq =
   if Unix.getuid () <> 0 then
@@ -490,10 +485,7 @@ let create ~pci_addr ~rxq ~txq =
       num_txq = txq;
       txqs = init_tx ra txq;
       ra;
-      rx_pkts = 0;
-      tx_pkts = 0;
-      rx_bytes = 0;
-      tx_bytes = 0
+      stats = { rx_pkts = 0; tx_pkts = 0; rx_bytes = 0; tx_bytes = 0 }
     } in
   reset_stats t;
   for i = 0 to rxq - 1 do
@@ -528,11 +520,11 @@ let shutdown t =
 let rx_batch ?(batch_size = max_int) t rxq_id =
   let wrap_rx index =
     index land (num_rx_queue_entries - 1) in
-  let { descriptors; pkt_bufs; mempool; _ } as rxq =
+  let { rxds; rx_bufs; mempool; _ } as rxq =
     t.rxqs.(rxq_id) in
   let num_done =
     let rec loop offset =
-      let rxd = descriptors.(wrap_rx (rxq.rx_index + offset)) in
+      let rxd = rxds.(wrap_rx (rxq.rx_index + offset)) in
       if offset < batch_size && RXD.dd rxd then
         loop (offset + 1)
       else
@@ -545,11 +537,11 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
       error "could not allocate enough buffers";
     let receive offset =
       let index = wrap_rx (rxq.rx_index + offset) in
-      let buf, rxd = pkt_bufs.(index), descriptors.(index) in
+      let buf, rxd = rx_bufs.(index), rxds.(index) in
       Memory.pkt_buf_resize buf ~size:(RXD.size rxd);
       let new_buf = empty_bufs.(offset) in
       RXD.reset rxd new_buf;
-      pkt_bufs.(index) <- new_buf;
+      rx_bufs.(index) <- new_buf;
       buf in
     Array.init num_done receive in
   if num_done > 0 then begin
@@ -561,15 +553,15 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
 let tx_batch t txq_id bufs =
   let wrap_tx index =
     index land (num_tx_queue_entries - 1) in
-  let { descriptors; pkt_bufs; _ } as txq = t.txqs.(txq_id) in
+  let { txds; tx_bufs; _ } as txq = t.txqs.(txq_id) in
   (* Returns wether or not tx_clean_batch descriptors can be cleaned. *)
   let check_clean () =
     let cleanable = wrap_tx (txq.tx_index - txq.clean_index) in
     cleanable >= tx_clean_batch
-    && TXD.dd descriptors.(wrap_tx (txq.clean_index + tx_clean_batch - 1)) in
+    && TXD.dd txds.(wrap_tx (txq.clean_index + tx_clean_batch - 1)) in
   let clean () =
     for i = 0 to tx_clean_batch - 1 do
-      Memory.pkt_buf_free pkt_bufs.(wrap_tx (txq.clean_index + i))
+      Memory.pkt_buf_free tx_bufs.(wrap_tx (txq.clean_index + i))
     done;
     txq.clean_index <- wrap_tx (txq.clean_index + tx_clean_batch) in
   while check_clean () do
@@ -581,8 +573,8 @@ let tx_batch t txq_id bufs =
   for i = 0 to n - 1 do
     (* send packet *)
     let index = wrap_tx (txq.tx_index + i) in
-    TXD.reset descriptors.(index) bufs.(i);
-    pkt_bufs.(index) <- bufs.(i)
+    TXD.reset txds.(index) bufs.(i);
+    tx_bufs.(index) <- bufs.(i)
   done;
   txq.tx_index <- wrap_tx (txq.tx_index + n);
   t.ra.set_reg (IXGBE.TDT txq_id) (Int32.of_int txq.tx_index);

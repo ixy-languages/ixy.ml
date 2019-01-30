@@ -2,34 +2,46 @@
  (name check_nic)
  (modes native)
  (libraries core cstruct ixy)
+ (flags :standard -w A-42-44)
+ (ocamlopt_flags -O3)
  (modules check_nic))
 
 (executable
  (name uname)
  (modes native)
  (libraries ixy)
+ (flags :standard -w A-42-44)
+ (ocamlopt_flags -O3)
  (modules uname))
 
 (executable
  (name pci_config)
  (modes native)
  (libraries ixy)
+ (flags :standard -w A-42-44)
+ (ocamlopt_flags -O3)
  (modules pci_config))
 
 (executable
  (name blink)
  (modes native)
  (libraries ixy)
+ (flags :standard -w A-42-44)
+ (ocamlopt_flags -O3)
  (modules blink))
 
 (executable
  (name parse_pci_addr)
  (modes native)
  (libraries ixy)
+ (flags :standard -w A-42-44)
+ (ocamlopt_flags -O3)
  (modules parse_pci_addr))
 
 (executable
  (name pagesize)
  (modes native)
  (libraries ixy)
+ (flags :standard -w A-42-44)
+ (ocamlopt_flags -O3)
  (modules pagesize))

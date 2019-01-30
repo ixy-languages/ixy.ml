@@ -24,12 +24,12 @@ let conf_path t =
 let enable_dma t =
   let fd = Unix.(openfile (conf_path t) [O_RDWR] 0o644) in
   (* we can't mmap the PCI configuration space. *)
-  assert (Unix.lseek fd 4 SEEK_SET = 4);
+  assert Unix.(lseek fd 4 SEEK_SET = 4);
   let dma = Bytes.create 2 in
   assert (Unix.read fd dma 0 2 = 2);
   let low = int_of_char @@ Bytes.get dma 0 in
   Bytes.set dma 0 (char_of_int (low lor (1 lsl 2)));
-  assert (Unix.lseek fd 4 SEEK_SET = 4);
+  assert Unix.(lseek fd 4 SEEK_SET = 4);
   (* maybe the write needs to be 2 byte? *)
   assert (Unix.write fd dma 0 2 = 2);
   Unix.close fd

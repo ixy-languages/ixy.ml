@@ -4,7 +4,7 @@ val pagesize : int
 type dma_memory = private {
   virt : Cstruct.t;
   (** DMA memory wrapped in a Cstruct.t *)
-  phys : Cstruct.uint64
+  physical : Cstruct.uint64
   (** Physical address of the beginning of the DMA memory buffer. *)
 }
 (** Type of allocated DMA-ready memory. *)

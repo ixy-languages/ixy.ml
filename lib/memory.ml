@@ -2,7 +2,7 @@ open Log
 
 type dma_memory = {
   virt : Cstruct.t;
-  phys : Cstruct.uint64
+  physical : Cstruct.uint64
 }
 
 external pagesize : unit -> int = "ixy_pagesize" [@@noalloc]
@@ -65,13 +65,13 @@ let allocate_dma ?(require_contiguous = true) size =
   mlock virt;
   Unix.close fd;
   Unix.unlink path;
-  let phys = virt_to_phys virt in
+  let physical = virt_to_phys virt in
   debug
     "allocated %#x bytes of dma memory at virt %#018Lx, phys %#018Lx"
     size
     (int64_of_addr virt)
-    phys;
-  { virt; phys }
+    physical;
+  { virt; physical }
 
 type mempool = {
   entry_size : int;
