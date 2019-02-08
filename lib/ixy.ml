@@ -18,8 +18,6 @@ let max_tx_queue_entries = 4096
 let num_rx_queue_entries = 512
 let num_tx_queue_entries = 512
 
-let tx_clean_batch = 32
-
 module RXD = struct
   [@@@ocaml.warning "-32"]
 
@@ -55,9 +53,9 @@ module RXD = struct
     match status land (stat_dd lor stat_eop) with
     | 0b11 -> true
     | 0b01 -> error "jumbo frames are not supported"
-    | _ -> false
+    | _ -> false [@@inline]
 
-  let size t = get_adv_rxd_wb_length t
+  let size t = get_adv_rxd_wb_length t [@@inline]
 
   let split num cs =
     let len = Cstruct.len cs in
@@ -69,7 +67,7 @@ module RXD = struct
 
   let reset cs Memory.{ phys; _ } =
     set_adv_rxd_read_pkt_addr cs phys;
-    set_adv_rxd_read_hdr_addr cs 0L
+    set_adv_rxd_read_hdr_addr cs 0L [@@inline]
 end
 
 module TXD = struct
@@ -100,7 +98,7 @@ module TXD = struct
 
   let dd t =
     let stat_dd = 0b1 in
-    (get_adv_tx_wb_status t) land stat_dd <> 0
+    (get_adv_tx_wb_status t) land stat_dd <> 0 [@@inline]
 
   let split num cs =
     let len = Cstruct.len cs in
@@ -110,16 +108,17 @@ module TXD = struct
       num
       (fun i -> Cstruct.sub cs (i * sizeof) sizeof)
 
+  let const_part =
+    let dcmd_eop = 0x01000000l in
+    let dcmd_rs = 0x08000000l in
+    let dcmd_ifcs = 0x02000000l in
+    let dcmd_dext = 0x20000000l in
+    let dtyp_data = 0x00300000l in
+    let ( lor ) = Int32.logor in
+    dcmd_eop lor dcmd_rs lor dcmd_ifcs lor dcmd_dext lor dtyp_data
+
   let reset cs Memory.{ size; phys; _ } =
     set_adv_tx_read_buffer_addr cs phys;
-    let const_part =
-      let dcmd_eop = 0x01000000l in
-      let dcmd_rs = 0x08000000l in
-      let dcmd_ifcs = 0x02000000l in
-      let dcmd_dext = 0x20000000l in
-      let dtyp_data = 0x00300000l in
-      let ( lor ) = Int32.logor in
-      dcmd_eop lor dcmd_rs lor dcmd_ifcs lor dcmd_dext lor dtyp_data in
     let size = Int32.of_int size in
     set_adv_tx_read_cmd_type_len
       cs
@@ -127,7 +126,7 @@ module TXD = struct
     let paylen_shift = 14 in
     set_adv_tx_read_olinfo_status
       cs
-      (Int32.shift_left size paylen_shift)
+      (Int32.shift_left size paylen_shift) [@@inline]
 end
 
 type rxq = {
@@ -519,13 +518,13 @@ let shutdown t =
 
 let rx_batch ?(batch_size = max_int) t rxq_id =
   let wrap_rx index =
-    index land (num_rx_queue_entries - 1) in
+    index land (num_rx_queue_entries - 1) [@@inline] in
   let { rxds; rx_bufs; mempool; _ } as rxq =
     t.rxqs.(rxq_id) in
   let num_done =
     let rec loop offset =
       let rxd = rxds.(wrap_rx (rxq.rx_index + offset)) in
-      if offset < batch_size && RXD.dd rxd then
+      if offset < batch_size && (RXD.dd [@inlined]) rxd then
         loop (offset + 1)
       else
         offset in
@@ -538,11 +537,11 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
     let receive offset =
       let index = wrap_rx (rxq.rx_index + offset) in
       let buf, rxd = rx_bufs.(index), rxds.(index) in
-      buf.Memory.size <- RXD.size rxd;
+      buf.Memory.size <- (RXD.size [@inlined]) rxd;
       let new_buf = empty_bufs.(offset) in
-      RXD.reset rxd new_buf;
+      (RXD.reset [@inlined]) rxd new_buf;
       rx_bufs.(index) <- new_buf;
-      buf in
+      buf [@@inline] in
     Array.init num_done receive in
   if num_done > 0 then begin
     rxq.rx_index <- wrap_rx (rxq.rx_index + num_done);
@@ -552,20 +551,24 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
 
 let tx_batch t txq_id bufs =
   let wrap_tx index =
-    index land (num_tx_queue_entries - 1) in
+    index land (num_tx_queue_entries - 1) [@@inline] in
   let { txds; tx_bufs; _ } as txq = t.txqs.(txq_id) in
-  (* Returns wether or not tx_clean_batch descriptors can be cleaned. *)
+  let clean_batch = 32 in
+  (* Returns wether or not clean_batch descriptors can be cleaned. *)
   let check_clean () =
     let cleanable = wrap_tx (txq.tx_index - txq.clean_index) in
-    cleanable >= tx_clean_batch
-    && TXD.dd txds.(wrap_tx (txq.clean_index + tx_clean_batch - 1)) in
+    cleanable >= clean_batch
+    && (TXD.dd [@inlined]) txds.(wrap_tx (txq.clean_index + clean_batch - 1)) [@@inline] in
   let clean () =
-    for i = 0 to tx_clean_batch - 1 do
-      Memory.pkt_buf_free tx_bufs.(wrap_tx (txq.clean_index + i))
+    for i = 0 to clean_batch - 1 do
+      let buf = tx_bufs.(wrap_tx (txq.clean_index + i)) in
+      let mempool = buf.Memory.mempool in
+      mempool.Memory.free_bufs.(mempool.Memory.free) <- buf;
+      mempool.Memory.free <- mempool.Memory.free + 1
     done;
-    txq.clean_index <- wrap_tx (txq.clean_index + tx_clean_batch) in
-  while check_clean () do
-    clean ()
+    txq.clean_index <- wrap_tx (txq.clean_index + clean_batch) [@@inline] in
+  while (check_clean [@inlined]) () do
+    (clean [@inlined]) ()
   done;
   let num_empty_descriptors =
     wrap_tx (txq.clean_index - txq.tx_index - 1) in
@@ -573,7 +576,7 @@ let tx_batch t txq_id bufs =
   for i = 0 to n - 1 do
     (* send packet *)
     let index = wrap_tx (txq.tx_index + i) in
-    TXD.reset txds.(index) bufs.(i);
+    (TXD.reset [@inlined]) txds.(index) bufs.(i);
     tx_bufs.(index) <- bufs.(i)
   done;
   txq.tx_index <- wrap_tx (txq.tx_index + n);

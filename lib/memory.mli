@@ -18,20 +18,16 @@ val allocate_dma : ?require_contiguous:bool -> int -> dma_memory
     returned will have contiguous physical addresses; fails if [n] is larger
     than [huge_page_size]. *)
 
-type mempool
-(** Type of a memory pool. *)
+type mempool = {
+  entry_size : int;
+  num_entries : int;
+  mutable free : int;
+  free_bufs : pkt_buf array;
+}
+(** Type of a memory pool.
+    Not private so Ixy.tx_batch can free buffers directly. *)
 
-val allocate_mempool : ?pre_fill:Cstruct.t -> num_entries:int -> mempool
-(** [allocate_mempool ~pre_fill:data ~num_entries] allocates a mempool
-    with [num_entries] packet buffers. If [pre_fill] is provided, the packet
-    buffers will be initialized with [data] and their length will be set to
-    [data]'s length. Otherwise the [pkt_buf]s are zeroed and their initial
-    size will be set to 2048. *)
-
-val num_free_bufs : mempool -> int
-(** [num_free_bufs mempool] returns the number of free buffers in [mempool]. *)
-
-type pkt_buf = { (* not private so Ixy.rx_batch can write size directly *)
+and pkt_buf = { (* not private so Ixy.rx_batch can write size directly *)
   phys : Cstruct.uint64;
   (** Physical address of the [data] field's underlying [Cstruct.buffer]. *)
   mempool : mempool;
@@ -42,6 +38,16 @@ type pkt_buf = { (* not private so Ixy.rx_batch can write size directly *)
   (** Packet payload; always 2048 bytes in size. *)
 }
 (** Type of a packet buffer. *)
+
+val allocate_mempool : ?pre_fill:Cstruct.t -> num_entries:int -> mempool
+(** [allocate_mempool ~pre_fill:data ~num_entries] allocates a mempool
+    with [num_entries] packet buffers. If [pre_fill] is provided, the packet
+    buffers will be initialized with [data] and their length will be set to
+    [data]'s length. Otherwise the [pkt_buf]s are zeroed and their initial
+    size will be set to 2048. *)
+
+val num_free_bufs : mempool -> int
+(** [num_free_bufs mempool] returns the number of free buffers in [mempool]. *)
 
 val pkt_buf_alloc_batch : mempool -> num_bufs:int -> pkt_buf array
 (** [pkt_buf_alloc_batch mempool ~num_bufs] attempts to allocate [num_bufs]
