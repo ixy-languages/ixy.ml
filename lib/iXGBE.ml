@@ -1,166 +1,165 @@
 let default_mtu = 1518
 
 module EIMC = struct
-  type t = int32
+  type t = int
 
-  let interrupt_disable = 0x7FFFFFFFl
+  let interrupt_disable = 0x7FFFFFFF
 end
 
 module SPEED = struct
-  type t = int32
+  type t = int
 
-  let _10G = 0x30000000l
+  let _10G = 0x30000000
 
-  let _1G = 0x20000000l
+  let _1G = 0x20000000
 
-  let _100 = 0x10000000l
+  let _100 = 0x10000000
 end
 
 module LINKS = struct
-  type t = int32
+  type t = int
 
-  let up = 0x40000000l
+  let up = 0x40000000
 
-  let speed_82599 = 0x30000000l
+  let speed_82599 = 0x30000000
 end
 
 module CTRL = struct
-  type t = int32
+  type t = int
 
-  let lnk_rst = 0x00000008l
+  let lnk_rst = 0x00000008
 
-  let rst = 0x04000000l
+  let rst = 0x04000000
 
-  let ctrl_rst_mask = Int32.logor lnk_rst rst
+  let ctrl_rst_mask = lnk_rst lor rst
 end
 
 module EEC = struct
-  type t = int32
+  type t = int
 
-  let ard = 0x00000200l (* EEPROM Auto Read Done *)
+  let ard = 0x00000200 (* EEPROM Auto Read Done *)
 end
 
 module RDRXCTL = struct
-  type t = int32
+  type t = int
 
-  let dmaidone = 0x00000008l (* DMA init cycle done *)
+  let dmaidone = 0x00000008 (* DMA init cycle done *)
 
-  let crcstrip = 0x00000002l
+  let crcstrip = 0x00000002
 end
 
 module AUTOC = struct
-  type t = int32
+  type t = int
 
   let lms_shift = 13
 
-  let lms_mask = Int32.shift_left 0x7l lms_shift
+  let lms_mask = 0x7 lsl lms_shift
 
-  let lms_10G_serial = Int32.shift_left 0x3l lms_shift
+  let lms_10G_serial = 0x3 lsl lms_shift
 
-  let _10G_pma_pmd_mask = 0x00000180l
+  let _10G_pma_pmd_mask = 0x00000180
 
   let _10G_pma_pmd_shift = 7
 
-  let _10G_xaui = Int32.shift_left 0x0l _10G_pma_pmd_shift
+  let _10G_xaui = 0x0 lsl _10G_pma_pmd_shift
 
-  let an_restart = 0x00001000l
+  let an_restart = 0x00001000
 end
 
 module RXCTRL = struct
-  type t = int32
+  type t = int
 
-  let rxen = 0x00000001l
+  let rxen = 0x00000001
 end
 
 module RXPBSIZE = struct
-  type t = int32
+  type t = int
 
-  let _128KB = 0x00020000l
+  let _128KB = 0x00020000
 end
 
 module HLREG0 = struct
-  type t = int32
+  type t = int
 
-  let txcrcen = 0x00000001l
+  let txcrcen = 0x00000001
 
-  let rxcrcstrp = 0x00000002l
+  let rxcrcstrp = 0x00000002
 
-  let txpaden = 0x00000400l
+  let txpaden = 0x00000400
 end
 
 module FCTRL = struct
-  type t = int32
+  type t = int
 
-  let bam = 0x00000400l (* Broadcast Accept Mode *)
+  let bam = 0x00000400 (* Broadcast Accept Mode *)
 
-  let mpe = 0x00000100l (* Multicast Promiscuous Enable *)
+  let mpe = 0x00000100 (* Multicast Promiscuous Enable *)
 
-  let upe = 0x00000200l (* Unicast Promiscuous Enable *)
+  let upe = 0x00000200 (* Unicast Promiscuous Enable *)
 
-  let pe = Int32.logor mpe upe (* Promiscuous Enable *)
+  let pe = mpe lor upe (* Promiscuous Enable *)
 end
 
 module SRRCTL = struct
-  type t = int32
+  type t = int
 
-  let desctype_mask = 0x0E000000l
+  let desctype_mask = 0x0E000000
 
-  let desctype_adv_onebuf = 0x02000000l
+  let desctype_adv_onebuf = 0x02000000
 
-  let drop_en = 0x10000000l
+  let drop_en = 0x10000000
 end
 
 module CTRL_EXT = struct
-  type t = int32
+  type t = int
 
-  let ns_dis = 0x00010000l
+  let ns_dis = 0x00010000
 end
 
 module RXDCTL = struct
-  type t = int32
+  type t = int
 
-  let enable = 0x02000000l
+  let enable = 0x02000000
 end
 
 module TXPBSIZE = struct
-  type t = int32
+  type t = int
 
-  let _40KB = 0x0000A000l
+  let _40KB = 0x0000A000
 end
 
 module RTTDCS = struct
-  type t = int32
+  type t = int
 
-  let arbdis = 0x00000040l
+  let arbdis = 0x00000040
 end
 
 module TXDCTL = struct
-  type t = int32
+  type t = int
 
-  let enable = 0x02000000l
+  let enable = 0x02000000
 end
 
 module DMATXCTL = struct
-  type t = int32
+  type t = int
 
-  let te = 0x1l
+  let te = 0x1
 end
 
 module LEDCTL = struct
-  type t = int32
+  type t = int
 
-  let mode_mask index =
-    Int32.shift_left 0xFl (8 * index)
+  let mode_mask index = 0xF lsl (8 * index)
 
   let mode_shift index = 8 * index
 
   let led_on old index =
-    let masked = Int32.(logand old (lognot (mode_mask index))) in
-    Int32.(logor masked (shift_left 0xEl (mode_shift index)))
+    let masked = old land (lnot (mode_mask index)) in
+    masked lor (0xE lsl (mode_shift index))
 
   let led_off old index =
-    let masked = Int32.(logand old (lognot (mode_mask index))) in
-    Int32.(logor masked (shift_left 0xFl (mode_shift index)))
+    let masked = old land (lnot (mode_mask index)) in
+    masked lor (0xF lsl (mode_shift index))
 end
 
 type register =
@@ -203,7 +202,9 @@ type register =
   | RAL of int (* Receive Address Low *)
   | RAH of int (* Receive Address High *)
 
-let register_to_int register =
+type reg = int
+
+let register_to_reg register =
   match register with
   | LINKS -> 0x042A4
   | EIMC -> 0x00888
@@ -322,27 +323,29 @@ let register_to_string register =
   | RAL i -> sprintf "RAL[%d]" i
   | RAH i -> sprintf "RAH[%d]" i
 
+external get_reg_fast : PCI.hw -> reg -> int = "ixy_get_reg32" [@@noalloc]
+
+external set_reg_fast :
+  PCI.hw -> reg -> int -> unit = "ixy_set_reg32" [@@noalloc]
+
 let get_reg hw register =
-  let data = Cstruct.LE.get_uint32 hw (register_to_int register) in
-  (*Log.debug "%s = %lx" (register_to_string register) data;*)
-  data
+  get_reg_fast hw (register_to_reg register)
 
 let set_reg hw register data =
-  (*Log.debug "%s := %lx" (register_to_string register) data;*)
-  Cstruct.LE.set_uint32 hw (register_to_int register) data
+  set_reg_fast hw (register_to_reg register) data
 
 let set_flags hw register flags =
-  set_reg hw register (Int32.logor (get_reg hw register) flags)
+  set_reg hw register ((get_reg hw register) lor flags)
 
 let clear_flags hw register flags =
-  set_reg hw register Int32.(logand (get_reg hw register) (lognot flags))
+  set_reg hw register ((get_reg hw register) land (lnot flags))
 
 let wait_clear hw register mask =
-  while (Int32.logand (get_reg hw register) mask <> 0l) do
+  while (get_reg hw register) land mask <> 0 do
     Unix.sleepf 0.01
   done
 
 let wait_set hw register mask =
-  while (Int32.logand (get_reg hw register) mask <> mask) do
+  while (get_reg hw register) land mask <> mask do
     Unix.sleepf 0.01
   done

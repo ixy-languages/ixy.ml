@@ -22,8 +22,8 @@ let () =
     | _ -> Log.warn "LEDs can only be turned on or off"; usage () in
   let hw = PCI.map_resource pci_addr in
   let led_old = IXGBE.get_reg hw IXGBE.LEDCTL in
-  Log.debug "LEDCTL = %#lx" led_old;
+  Log.debug "LEDCTL = %#x" led_old;
   let led_new =
     IXGBE.LEDCTL.(if on then led_on else led_off) led_old index in
-  Log.debug "LEDCTL := %#lx" led_new;
+  Log.debug "LEDCTL := %#x" led_new;
   IXGBE.set_reg hw IXGBE.LEDCTL led_new

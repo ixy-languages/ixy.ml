@@ -130,6 +130,7 @@ module TXD = struct
 end
 
 type rxq = {
+  rdt : IXGBE.reg;
   rxds : RXD.t array;
   mempool : Memory.mempool;
   mutable rx_index : int;
@@ -137,6 +138,7 @@ type rxq = {
 }
 
 type txq = {
+  tdt : IXGBE.reg;
   txds : TXD.t array;
   mutable clean_index : int;
   mutable tx_index : int;
@@ -144,12 +146,12 @@ type txq = {
 }
 
 type register_access = {
-  get_reg : IXGBE.register -> int32;
-  set_reg : IXGBE.register -> int32 -> unit;
-  set_flags : IXGBE.register -> int32 -> unit;
-  clear_flags : IXGBE.register -> int32 -> unit;
-  wait_set : IXGBE.register -> int32 -> unit;
-  wait_clear : IXGBE.register -> int32 -> unit
+  get_reg : IXGBE.register -> int;
+  set_reg : IXGBE.register -> int -> unit;
+  set_flags : IXGBE.register -> int -> unit;
+  clear_flags : IXGBE.register -> int -> unit;
+  wait_set : IXGBE.register -> int -> unit;
+  wait_clear : IXGBE.register -> int -> unit
 }
 
 type stats = {
@@ -160,6 +162,7 @@ type stats = {
 }
 
 type t = {
+  hw : PCI.hw;
   pci_addr : string;
   num_rxq : int;
   rxqs : rxq array;
@@ -192,15 +195,11 @@ let init_link ra =
   let autoc = ra.get_reg IXGBE.AUTOC in
   ra.set_reg
     IXGBE.AUTOC
-    Int32.(logor
-             (logand autoc (lognot IXGBE.AUTOC.lms_mask))
-             IXGBE.AUTOC.lms_10G_serial);
+    ((autoc land (lnot IXGBE.AUTOC.lms_mask)) lor IXGBE.AUTOC.lms_10G_serial);
   let autoc = ra.get_reg IXGBE.AUTOC in
   ra.set_reg
     IXGBE.AUTOC
-    Int32.(logor
-             (logand autoc (lognot IXGBE.AUTOC._10G_pma_pmd_mask))
-             IXGBE.AUTOC._10G_xaui);
+    ((autoc land (lnot IXGBE.AUTOC._10G_pma_pmd_mask)) lor IXGBE.AUTOC._10G_xaui);
   ra.set_flags IXGBE.AUTOC IXGBE.AUTOC.an_restart
 
 let init_rx ra n =
@@ -210,7 +209,7 @@ let init_rx ra n =
     (* 128KB packet buffers *)
     ra.set_reg (IXGBE.RXPBSIZE 0) IXGBE.RXPBSIZE._128KB;
     for i = 1 to 7 do
-      ra.set_reg (IXGBE.RXPBSIZE i) 0l
+      ra.set_reg (IXGBE.RXPBSIZE i) 0
     done;
     (* enable CRC offload *)
     ra.set_flags IXGBE.HLREG0 IXGBE.HLREG0.rxcrcstrp;
@@ -223,9 +222,7 @@ let init_rx ra n =
       let srrctl = ra.get_reg (IXGBE.SRRCTL i) in
       ra.set_reg
         (IXGBE.SRRCTL i)
-        Int32.(logor
-                 (logand srrctl (lognot IXGBE.SRRCTL.desctype_mask))
-                 IXGBE.SRRCTL.desctype_adv_onebuf);
+        ((srrctl land (lnot IXGBE.SRRCTL.desctype_mask)) lor IXGBE.SRRCTL.desctype_adv_onebuf);
       (* drop packets if no rx descriptors available *)
       ra.set_flags (IXGBE.SRRCTL i) IXGBE.SRRCTL.drop_en;
       (* setup descriptor ring *)
@@ -244,13 +241,13 @@ let init_rx ra n =
       ra.set_reg (IXGBE.RDBAL i) lo;
       ra.set_reg (IXGBE.RDBAH i) hi;
       (* set ring length *)
-      ra.set_reg (IXGBE.RDLEN i) (Int32.of_int ring_size_bytes);
+      ra.set_reg (IXGBE.RDLEN i) ring_size_bytes;
       debug "rx ring %d phy addr: %#018Lx" i descriptor_ring.Memory.physical;
       (* ring head = ring tail = 0
        * -> ring is empty
        * -> NIC won't write packets until we start the queue *)
-      ra.set_reg (IXGBE.RDH i) 0l;
-      ra.set_reg (IXGBE.RDT i) 0l;
+      ra.set_reg (IXGBE.RDH i) 0;
+      ra.set_reg (IXGBE.RDT i) 0;
       let mempool_size = num_rx_queue_entries + num_tx_queue_entries in
       let mempool =
         Memory.allocate_mempool
@@ -260,7 +257,8 @@ let init_rx ra n =
         Memory.pkt_buf_alloc_batch
           mempool
           ~num_bufs:num_rx_queue_entries in
-      { rxds;
+      { rdt = IXGBE.(register_to_reg @@ RDT i);
+        rxds;
         mempool;
         rx_index = 0;
         rx_bufs
@@ -270,7 +268,7 @@ let init_rx ra n =
     ra.set_flags IXGBE.CTRL_EXT IXGBE.CTRL_EXT.ns_dis;
     (* set magic bits *)
     for i = 0 to n - 1 do
-      ra.clear_flags (IXGBE.DCA_RXCTRL i) Int32.(shift_left 1l 12)
+      ra.clear_flags (IXGBE.DCA_RXCTRL i) (1 lsl 12)
     done;
     ra.set_flags IXGBE.RXCTRL IXGBE.RXCTRL.rxen;
     rxqs
@@ -289,20 +287,20 @@ let start_rx t i =
     rxq.rx_bufs;
   t.ra.set_flags (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
   t.ra.wait_set (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
-  t.ra.set_reg (IXGBE.RDH i) 0l; (* should already be 0l? *)
-  t.ra.set_reg (IXGBE.RDT i) Int32.(pred (of_int num_rx_queue_entries))
+  t.ra.set_reg (IXGBE.RDH i) 0; (* should already be 0? *)
+  t.ra.set_reg (IXGBE.RDT i) (pred num_rx_queue_entries)
 
 let init_tx ra n =
   if n > 0 then begin
     (* enable crc offload and small packet padding *)
     ra.set_flags
       IXGBE.HLREG0
-      Int32.(logor IXGBE.HLREG0.txcrcen IXGBE.HLREG0.txpaden);
+      (IXGBE.HLREG0.txcrcen lor IXGBE.HLREG0.txpaden);
     ra.set_reg (IXGBE.TXPBSIZE 0) IXGBE.TXPBSIZE._40KB;
     for i = 1 to 7 do
-      ra.set_reg (IXGBE.TXPBSIZE i) 0l
+      ra.set_reg (IXGBE.TXPBSIZE i) 0
     done;
-    ra.set_reg IXGBE.DTXMXSZRQ 0xFFFFl;
+    ra.set_reg IXGBE.DTXMXSZRQ 0xFFFF;
     ra.clear_flags IXGBE.RTTDCS IXGBE.RTTDCS.arbdis;
     let init_txq i =
       debug "initializing txq %d" i;
@@ -316,25 +314,13 @@ let init_tx ra n =
       ra.set_reg (IXGBE.TDBAL i) lo;
       ra.set_reg (IXGBE.TDBAH i) hi;
       (* set ring length *)
-      ra.set_reg (IXGBE.TDLEN i) (Int32.of_int ring_size_bytes);
+      ra.set_reg (IXGBE.TDLEN i) ring_size_bytes;
       debug "tx ring %d phy addr: %#018Lx" i descriptor_ring.Memory.physical;
       let txdctl_old =
         ra.get_reg (IXGBE.TXDCTL i) in
       let txdctl_magic_bits =
-        let open Int32 in
-        logor
-          (logand
-             txdctl_old
-             (logor
-                (lognot 0x3Fl)
-                (logor
-                   (shift_left 0x3Fl 8)
-                   (shift_left 0x3Fl 16))))
-          (logor
-             36l
-             (logor
-                (shift_left 8l 8)
-                (shift_left 4l 16))) in
+        (txdctl_old land ((lnot 0x3F) lor ((0x3F lsl 8) lor (0x3F lsl 16))))
+        lor (36 lor ((8 lsl 8) lor (4 lsl 16))) in
       ra.set_reg (IXGBE.TXDCTL i) txdctl_magic_bits;
       let txds =
         TXD.split
@@ -342,7 +328,8 @@ let init_tx ra n =
           descriptor_ring.Memory.virt in
       let tx_bufs =
         Array.make num_tx_queue_entries Memory.dummy in
-      { txds;
+      { tdt = IXGBE.(register_to_reg @@ TDT i);
+        txds;
         clean_index = 0;
         tx_index = 0;
         tx_bufs;
@@ -357,8 +344,8 @@ let start_tx t i =
   info "starting txq %d" i;
   if num_tx_queue_entries land (num_tx_queue_entries - 1) <> 0 then
     error "number of tx queue entries must be a power of 2";
-  t.ra.set_reg (IXGBE.TDH i) 0l;
-  t.ra.set_reg (IXGBE.TDT i) 0l;
+  t.ra.set_reg (IXGBE.TDH i) 0;
+  t.ra.set_reg (IXGBE.TDT i) 0;
   t.ra.set_flags (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable;
   t.ra.wait_set (IXGBE.TXDCTL i) IXGBE.TXDCTL.enable
 
@@ -370,12 +357,12 @@ let set_promisc t on =
 let check_link t =
   let links_reg = t.ra.get_reg IXGBE.LINKS in
   let speed =
-    match Int32.logand links_reg IXGBE.LINKS.speed_82599 with
+    match links_reg land IXGBE.LINKS.speed_82599 with
     | speed when speed = IXGBE.SPEED._10G -> `SPEED_10G
     | speed when speed = IXGBE.SPEED._1G -> `SPEED_1G
     | speed when speed = IXGBE.SPEED._100 -> `SPEED_100
     | _ -> `SPEED_UNKNOWN in
-  let link_up = Int32.logand links_reg IXGBE.LINKS.up <> 0l in
+  let link_up = links_reg land IXGBE.LINKS.up <> 0 in
   (speed, link_up)
 
 let wait_for_link t =
@@ -399,15 +386,13 @@ let wait_for_link t =
 
 let get_stats t =
   let { stats; ra; _ } = t in
-  stats.rx_pkts <- stats.rx_pkts + Int32.to_int (ra.get_reg IXGBE.GPRC);
-  stats.tx_pkts <- stats.tx_pkts + Int32.to_int (ra.get_reg IXGBE.GPTC);
+  stats.rx_pkts <- stats.rx_pkts + ra.get_reg IXGBE.GPRC;
+  stats.tx_pkts <- stats.tx_pkts + ra.get_reg IXGBE.GPTC;
   let new_rx_bytes =
-    Int32.to_int (ra.get_reg IXGBE.GORCL)
-    + (Int32.to_int (ra.get_reg IXGBE.GORCH) lsl 32) in
+    (ra.get_reg IXGBE.GORCL) + ((ra.get_reg IXGBE.GORCH) lsl 32) in
   stats.rx_bytes <- stats.rx_bytes + new_rx_bytes;
   let new_tx_bytes =
-    Int32.to_int (ra.get_reg IXGBE.GOTCL)
-    + (Int32.to_int (ra.get_reg IXGBE.GOTCH) lsl 32) in
+    (ra.get_reg IXGBE.GOTCL) + ((ra.get_reg IXGBE.GOTCH) lsl 32) in
   stats.tx_bytes <- stats.tx_bytes + new_tx_bytes;
   stats
 
@@ -415,8 +400,8 @@ let get_mac t =
   let mac = Cstruct.create 6 in
   let low = t.ra.get_reg (IXGBE.RAL 0) in
   let high = t.ra.get_reg (IXGBE.RAH 0) in
-  Cstruct.LE.set_uint32 mac 0 low;
-  Cstruct.LE.set_uint16 mac 4 (Int32.to_int high);
+  Cstruct.LE.set_uint32 mac 0 (Int32.of_int low);
+  Cstruct.LE.set_uint16 mac 4 high;
   mac
 
 let reset_stats t =
@@ -478,7 +463,8 @@ let create ~pci_addr ~rxq ~txq =
   ra.wait_set IXGBE.RDRXCTL IXGBE.RDRXCTL.dmaidone;
   init_link ra;
   let t =
-    { pci_addr = pci_addr_str;
+    { hw;
+      pci_addr = pci_addr_str;
       num_rxq = rxq;
       rxqs = init_rx ra rxq;
       num_txq = txq;
@@ -507,7 +493,7 @@ let shutdown t =
   let shutdown_tx i txq =
     info "shutting down txq %d" i;
     debug "waiting for %s" IXGBE.(register_to_string (TDH i));
-    while t.ra.get_reg (IXGBE.TDH i) <> (Int32.of_int txq.tx_index) do
+    while t.ra.get_reg (IXGBE.TDH i) <> txq.tx_index do
       Unix.sleepf 0.01
     done;
     debug "done waiting";
@@ -519,7 +505,7 @@ let shutdown t =
 let rx_batch ?(batch_size = max_int) t rxq_id =
   let wrap_rx index =
     index land (num_rx_queue_entries - 1) [@@inline] in
-  let { rxds; rx_bufs; mempool; _ } as rxq =
+  let { rdt; rxds; rx_bufs; mempool; _ } as rxq =
     t.rxqs.(rxq_id) in
   let num_done =
     let rec loop offset =
@@ -545,14 +531,14 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
     Array.init num_done receive in
   if num_done > 0 then begin
     rxq.rx_index <- wrap_rx (rxq.rx_index + num_done);
-    t.ra.set_reg (IXGBE.RDT rxq_id) (Int32.of_int (wrap_rx (rxq.rx_index - 1)))
+    IXGBE.set_reg_fast t.hw rdt (wrap_rx (rxq.rx_index - 1))
   end;
   bufs
 
 let tx_batch t txq_id bufs =
   let wrap_tx index =
     index land (num_tx_queue_entries - 1) [@@inline] in
-  let { txds; tx_bufs; _ } as txq = t.txqs.(txq_id) in
+  let { tdt; txds; tx_bufs; _ } as txq = t.txqs.(txq_id) in
   let clean_batch = 32 in
   (* Returns wether or not clean_batch descriptors can be cleaned. *)
   let check_clean () =
@@ -580,7 +566,7 @@ let tx_batch t txq_id bufs =
     tx_bufs.(index) <- bufs.(i)
   done;
   txq.tx_index <- wrap_tx (txq.tx_index + n);
-  t.ra.set_reg (IXGBE.TDT txq_id) (Int32.of_int txq.tx_index);
+  IXGBE.set_reg_fast t.hw tdt txq.tx_index;
   Array.sub bufs n (Array.length bufs - n)
 
 let tx_batch_busy_wait t txq_id bufs =

@@ -114,6 +114,7 @@ end
 (** Transmit descriptor handling. *)
 
 type rxq = private {
+  rdt : IXGBE.reg;
   rxds : RXD.t array;
   (** RX descriptor ring. *)
   mempool : Memory.mempool;
@@ -127,6 +128,7 @@ type rxq = private {
 (** Type of a receive queue. *)
 
 type txq = private {
+  tdt : IXGBE.reg;
   txds : TXD.t array;
   (** TX descriptor ring. *)
   mutable clean_index : int;
@@ -141,12 +143,12 @@ type txq = private {
 (** Type of a transmit queue. *)
 
 type register_access = private {
-  get_reg : IXGBE.register -> int32;
-  set_reg : IXGBE.register -> int32 -> unit;
-  set_flags : IXGBE.register -> int32 -> unit;
-  clear_flags : IXGBE.register -> int32 -> unit;
-  wait_set : IXGBE.register -> int32 -> unit;
-  wait_clear : IXGBE.register -> int32 -> unit
+  get_reg : IXGBE.register -> int;
+  set_reg : IXGBE.register -> int -> unit;
+  set_flags : IXGBE.register -> int -> unit;
+  clear_flags : IXGBE.register -> int -> unit;
+  wait_set : IXGBE.register -> int -> unit;
+  wait_clear : IXGBE.register -> int -> unit
 }
 (** Type of register access function set. *)
 
@@ -159,6 +161,7 @@ type stats = private {
 (** Type of statistics. *)
 
 type t = private {
+  hw : PCI.hw;
   pci_addr : string;
   num_rxq : int;
   rxqs : rxq array;

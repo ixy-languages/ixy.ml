@@ -31,3 +31,18 @@ CAMLprim value ixy_mlock(value v_buf, value v_off, value v_size) {
         uerror("mlock", Nothing);
     CAMLreturn(Val_unit);
 }
+
+CAMLprim value ixy_get_reg32(value v_buf, value v_reg) {
+    CAMLparam2(v_buf, v_reg);
+    __asm__ volatile ("" : : : "memory");
+    void *base = Caml_ba_data_val(v_buf);
+    CAMLreturn(Val_long(*((volatile uint32_t *) (base + Long_val(v_reg)))));
+}
+
+CAMLprim value ixy_set_reg32(value v_buf, value v_reg, value v_data) {
+    CAMLparam3(v_buf, v_reg, v_data);
+    __asm__ volatile ("" : : : "memory");
+    void *base = Caml_ba_data_val(v_buf);
+    *((volatile uint32_t *) (base + Long_val(v_reg))) = Long_val(v_data);
+    CAMLreturn(Val_unit);
+}

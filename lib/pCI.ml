@@ -7,7 +7,8 @@ let of_string str =
 
 let to_string t = t
 
-type hw = Cstruct.t
+type hw =
+  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 
 let remove_driver t =
   let path =
@@ -39,7 +40,9 @@ let map_resource t =
   enable_dma t;
   let path = Printf.sprintf "/sys/bus/pci/devices/%s/resource0" t in
   let fd = Unix.(openfile path [O_RDWR] 0o644) in
-  let hw = Util.mmap fd in
+  let hw =
+    Bigarray.(Unix.map_file fd char c_layout true [|-1|])
+    |> Bigarray.array1_of_genarray in
   (* ixy doesn't do this but there shouldn't be a reason to keep fd around *)
   Unix.close fd;
   hw

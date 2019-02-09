@@ -8,7 +8,8 @@ val of_string : string -> t option
 val to_string : t -> string
 (** [to_string t] returns the string representation of [t]. *)
 
-type hw = Cstruct.t
+type hw =
+  private (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 (** Type of register files (also called [hw] in the linux ixgbe driver). *)
 
 val map_resource : t -> hw

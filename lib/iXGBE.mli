@@ -1,13 +1,13 @@
 val default_mtu : int
 
 module EIMC : sig
-  type t = int32
+  type t = int
 
   val interrupt_disable : t
 end
 
 module SPEED : sig
-  type t = int32
+  type t = int
 
   val _10G : t (* 10 Gigabit/s *)
 
@@ -17,7 +17,7 @@ module SPEED : sig
 end
 
 module LINKS : sig
-  type t = int32
+  type t = int
 
   val up : t
 
@@ -25,7 +25,7 @@ module LINKS : sig
 end
 
 module CTRL : sig
-  type t = int32
+  type t = int
 
   val lnk_rst : t
 
@@ -35,13 +35,13 @@ module CTRL : sig
 end
 
 module EEC : sig
-  type t = int32
+  type t = int
 
   val ard : t
 end
 
 module RDRXCTL : sig
-  type t = int32
+  type t = int
 
   val dmaidone : t
 
@@ -49,7 +49,7 @@ module RDRXCTL : sig
 end
 
 module AUTOC : sig
-  type t = int32
+  type t = int
 
   val lms_mask : t
 
@@ -63,19 +63,19 @@ module AUTOC : sig
 end
 
 module RXCTRL : sig
-  type t = int32
+  type t = int
 
   val rxen : t
 end
 
 module RXPBSIZE : sig
-  type t = int32
+  type t = int
 
   val _128KB : t
 end
 
 module HLREG0 : sig
-  type t = int32
+  type t = int
 
   val txcrcen : t
 
@@ -85,7 +85,7 @@ module HLREG0 : sig
 end
 
 module FCTRL : sig
-  type t = int32
+  type t = int
 
   val bam : t
 
@@ -93,7 +93,7 @@ module FCTRL : sig
 end
 
 module SRRCTL : sig
-  type t = int32
+  type t = int
 
   val desctype_mask : t
 
@@ -103,47 +103,47 @@ module SRRCTL : sig
 end
 
 module CTRL_EXT : sig
-  type t = int32
+  type t = int
 
   val ns_dis : t
 end
 
 module RXDCTL : sig
-  type t = int32
+  type t = int
 
   val enable : t
 end
 
 module TXPBSIZE : sig
-  type t = int32
+  type t = int
 
   val _40KB : t
 end
 
 module RTTDCS : sig
-  type t = int32
+  type t = int
 
   val arbdis : t (* DCB arbiter disable *)
 end
 
 module TXDCTL : sig
-  type t = int32
+  type t = int
 
   val enable : t
 end
 
 module DMATXCTL : sig
-  type t = int32
+  type t = int
 
   val te : t (* transmit enable *)
 end
 
 module LEDCTL : sig
-  type t = int32
+  type t = int
 
-  val led_on : int32 -> int -> int32
+  val led_on : int -> int -> t
 
-  val led_off : int32 -> int -> int32
+  val led_off : int -> int -> t
 end
 
 (* FIXME reorder registers to allow sorting by offset range *)
@@ -187,16 +187,25 @@ type register =
   | RAL of int (* Receive Address Low *)
   | RAH of int (* Receive Address High *)
 
+type reg
+
+val register_to_reg : register -> reg
+
 val register_to_string : register -> string
 
-val get_reg : PCI.hw -> register -> int32
+external get_reg_fast : PCI.hw -> reg -> int = "ixy_get_reg32" [@@noalloc]
 
-val set_reg : PCI.hw -> register -> int32 -> unit
+external set_reg_fast :
+  PCI.hw -> reg -> int -> unit = "ixy_set_reg32" [@@noalloc]
 
-val set_flags : PCI.hw -> register -> int32 -> unit
+val get_reg : PCI.hw -> register -> int
 
-val clear_flags : PCI.hw -> register -> int32 -> unit
+val set_reg : PCI.hw -> register -> int -> unit
 
-val wait_set : PCI.hw -> register -> int32 -> unit
+val set_flags : PCI.hw -> register -> int -> unit
 
-val wait_clear : PCI.hw -> register -> int32 -> unit
+val clear_flags : PCI.hw -> register -> int -> unit
+
+val wait_set : PCI.hw -> register -> int -> unit
+
+val wait_clear : PCI.hw -> register -> int -> unit
