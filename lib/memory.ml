@@ -143,7 +143,7 @@ let pkt_buf_alloc_batch mempool ~num_bufs =
       mempool.num_entries;
   let n = min num_bufs mempool.free in
   let alloc_start = mempool.free - n in
-  let bufs = Array.sub mempool.free_bufs alloc_start n in
+  let bufs = List.init n (fun i -> mempool.free_bufs.(alloc_start + i)) in
   mempool.free <- alloc_start;
   bufs
 

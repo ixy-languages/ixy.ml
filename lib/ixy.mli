@@ -42,7 +42,7 @@ module Memory : sig
   }
   (** Type of a packet buffer. *)
 
-  val pkt_buf_alloc_batch : mempool -> num_bufs:int -> pkt_buf array
+  val pkt_buf_alloc_batch : mempool -> num_bufs:int -> pkt_buf list
   (** [pkt_buf_alloc_batch mempool ~num_bufs] attempts to allocate [num_bufs]
       packet buffers in [mempool]. If there are fewer than [num_bufs] free
       buffers in [mempool], all of them will be allocated. Errors and quits the
@@ -197,17 +197,17 @@ val get_stats : t -> stats
 (** [get_stats dev] returns the number of packets/bytes received/sent
     on [dev] since initialization or the last call to [reset_stats]. *)
 
-val rx_batch : ?batch_size:int -> t -> int -> Memory.pkt_buf array
+val rx_batch : ?batch_size:int -> t -> int -> Memory.pkt_buf list
 (** [rx_batch dev queue] receives packets from [dev]'s queue [queue].
     Returns between [0] and [num_rx_queue_entries] packets.
     If [batch_size] is specified then between [0] and [batch_size] packets
     will be returned. *)
 
-val tx_batch : t -> int -> Memory.pkt_buf array -> Memory.pkt_buf array
+val tx_batch : t -> int -> Memory.pkt_buf list -> Memory.pkt_buf list
 (** [tx_batch dev queue bufs] attempts to transmit [bufs] on
     [dev]'s queue [queue]. Returns the unsent packets. *)
 
-val tx_batch_busy_wait : t -> int -> Memory.pkt_buf array -> unit
+val tx_batch_busy_wait : t -> int -> Memory.pkt_buf list -> unit
 (** [tx_batch_busy_wait dev queue bufs] busy waits until all [bufs]
     have been transmitted on [dev]'s queue [queue] by repeatedly calling
     [tx_batch]. *)

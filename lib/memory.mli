@@ -48,7 +48,7 @@ val allocate_mempool : ?pre_fill:Cstruct.t -> num_entries:int -> mempool
 val num_free_bufs : mempool -> int
 (** [num_free_bufs mempool] returns the number of free buffers in [mempool]. *)
 
-val pkt_buf_alloc_batch : mempool -> num_bufs:int -> pkt_buf array
+val pkt_buf_alloc_batch : mempool -> num_bufs:int -> pkt_buf list
 (** [pkt_buf_alloc_batch mempool ~num_bufs] attempts to allocate [num_bufs]
     packet buffers in [mempool]. If there are fewer than [num_bufs] free
     buffers in [mempool], all of them will be allocated. Errors and quits the

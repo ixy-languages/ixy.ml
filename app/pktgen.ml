@@ -90,7 +90,7 @@ let () =
   while true do
     let bufs =
       Ixy.Memory.pkt_buf_alloc_batch mempool ~num_bufs:batch_size in
-    Array.iter
+    List.iter
       (fun Ixy.Memory.{ data; _ } ->
          Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
          seq_num := Int32.succ !seq_num)

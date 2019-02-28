@@ -266,7 +266,8 @@ let init_rx ra n =
       let rx_bufs =
         Memory.pkt_buf_alloc_batch
           mempool
-          ~num_bufs:num_rx_queue_entries in
+          ~num_bufs:num_rx_queue_entries
+        |> Array.of_list in
       { rdt = IXGBE.(register_to_reg @@ RDT i);
         rxds;
         mempool;
@@ -528,17 +529,14 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
   let bufs =
     let empty_bufs =
       Memory.pkt_buf_alloc_batch mempool ~num_bufs:num_done in
-    if Array.length empty_bufs <> num_done then
-      error "could not allocate enough buffers";
-    let receive offset =
+    let receive offset new_buf =
       let index = wrap_rx (rxq.rx_index + offset) in
       let buf, rxd = rx_bufs.(index), rxds.(index) in
       buf.Memory.size <- (RXD.size [@inlined]) rxd;
-      let new_buf = empty_bufs.(offset) in
       (RXD.reset [@inlined]) rxd new_buf;
       rx_bufs.(index) <- new_buf;
       buf [@@inline] in
-    Array.init num_done receive in
+    List.mapi receive empty_bufs in
   if num_done > 0 then begin
     rxq.rx_index <- wrap_rx (rxq.rx_index + num_done);
     IXGBE.set_reg_fast t.hw rdt (wrap_rx (rxq.rx_index - 1))
@@ -568,20 +566,25 @@ let tx_batch t txq_id bufs =
   done;
   let num_empty_descriptors =
     wrap_tx (txq.clean_index - txq.tx_index - 1) in
-  let n = min num_empty_descriptors (Array.length bufs) in
-  for i = 0 to n - 1 do
-    (* send packet *)
-    let index = wrap_tx (txq.tx_index + i) in
-    (TXD.reset [@inlined]) txds.(index) bufs.(i);
-    tx_bufs.(index) <- bufs.(i)
-  done;
+  let rec loop i l =
+    if i < num_empty_descriptors then
+      match l with
+      | [] -> [], i
+      | hd :: tl ->
+        let index = wrap_tx (txq.tx_index + i) in
+        TXD.reset txds.(index) hd;
+        tx_bufs.(index) <- hd;
+        loop (i + 1) tl
+    else
+      l, num_empty_descriptors in
+  let rem, n = loop 0 bufs in
   txq.tx_index <- wrap_tx (txq.tx_index + n);
   IXGBE.set_reg_fast t.hw tdt txq.tx_index;
-  Array.sub bufs n (Array.length bufs - n)
+  rem
 
 let tx_batch_busy_wait t txq_id bufs =
   let rec send bufs =
     let rest = tx_batch t txq_id bufs in
-    if Array.length rest <> 0 then
+    if rest <> [] then
       send rest in
   send bufs
