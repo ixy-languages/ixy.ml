@@ -109,24 +109,22 @@ module TXD = struct
       (fun i -> Cstruct.sub cs (i * sizeof) sizeof)
 
   let const_part =
-    let dcmd_eop = 0x01000000l in
-    let dcmd_rs = 0x08000000l in
-    let dcmd_ifcs = 0x02000000l in
-    let dcmd_dext = 0x20000000l in
-    let dtyp_data = 0x00300000l in
-    let ( lor ) = Int32.logor in
+    let dcmd_eop = 0x01000000 in
+    let dcmd_rs = 0x08000000 in
+    let dcmd_ifcs = 0x02000000 in
+    let dcmd_dext = 0x20000000 in
+    let dtyp_data = 0x00300000 in
     dcmd_eop lor dcmd_rs lor dcmd_ifcs lor dcmd_dext lor dtyp_data
 
   let reset cs Memory.{ size; phys; _ } =
     set_adv_tx_read_buffer_addr cs phys;
-    let size = Int32.of_int size in
     set_adv_tx_read_cmd_type_len
       cs
-      (Int32.logor const_part size);
+      (Int32.of_int (const_part lor size));
     let paylen_shift = 14 in
     set_adv_tx_read_olinfo_status
       cs
-      (Int32.shift_left size paylen_shift) [@@inline]
+      (Int32.of_int (size lsl paylen_shift)) [@@inline]
 end
 
 type rxq = {
