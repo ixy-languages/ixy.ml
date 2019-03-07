@@ -1,6 +1,6 @@
 let split i64 =
-  Int32.to_int (Obj.magic (Int64.logand i64 0xFFFFFFFFL) : int32),
-  Int32.to_int (Obj.magic (Int64.shift_right_logical i64 32) : int32)
+  (Int64.to_int (Int64.logand i64 0xFFFFFFFFL)),
+  (Int64.to_int (Int64.shift_right_logical i64 32))
 
 (* 'Unix_cstruct.of_fd' doesn't map the file as shared. *)
 let mmap fd =
