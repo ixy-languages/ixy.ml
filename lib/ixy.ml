@@ -18,6 +18,18 @@ let max_tx_queue_entries = 4096
 let num_rx_queue_entries = 512
 let num_tx_queue_entries = 512
 
+external ( < ) : 'a -> 'a -> bool = "%lessthan"
+external ( <= ) : 'a -> 'a -> bool = "%lessequal"
+external ( > ) : 'a -> 'a -> bool = "%greaterthan"
+external ( >= ) : 'a -> 'a -> bool = "%greaterequal"
+
+let ( > ) (x : int) y = x > y [@@inline]
+let ( <= ) (x : int) y = x <= y [@@inline]
+let ( < ) (x : int) y = x < y [@@inline]
+let ( >= ) (x : int) y = x >= y [@@inline]
+
+let min (a : int) b = if a <= b then a else b [@@inline]
+
 module RXD = struct
   [@@@ocaml.warning "-32"]
 
@@ -370,7 +382,7 @@ let wait_for_link t =
     match check_link t with
     | _, false
     | `SPEED_UNKNOWN, _ ->
-      if rem > 0. then begin
+      if Float.compare rem 0. > 0 then begin
         Unix.sleepf poll_interval;
         loop (rem -. poll_interval)
       end
@@ -570,6 +582,6 @@ let tx_batch t txq_id bufs =
 let tx_batch_busy_wait t txq_id bufs =
   let rec send bufs =
     let rest = tx_batch t txq_id bufs in
-    if rest <> [||] then
+    if Array.length rest = 0 then
       send rest in
   send bufs
