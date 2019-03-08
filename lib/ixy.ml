@@ -582,6 +582,6 @@ let tx_batch t txq_id bufs =
 let tx_batch_busy_wait t txq_id bufs =
   let rec send bufs =
     let rest = tx_batch t txq_id bufs in
-    if Array.length rest = 0 then
+    if Array.length rest <> 0 then
       send rest in
   send bufs
