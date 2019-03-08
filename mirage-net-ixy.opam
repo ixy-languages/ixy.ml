@@ -10,6 +10,7 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
 depends: [
+  "ixy"
   "macaddr"
   "mirage-net-lwt" {>= "2.0.0"}
   "cstruct"
