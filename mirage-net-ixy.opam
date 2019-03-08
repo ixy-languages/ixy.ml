@@ -1,0 +1,19 @@
+opam-version: "1.2"
+version: "0.0.1"
+maintainer: "mail@fabianbonk.de"
+authors: ["Fabian Bonk"]
+homepage: "https://github.com/ixy-languages/ixy.ml"
+bug-reports: "https://github.com/ixy-languages/ixy.ml/issues"
+dev-repo: "git://github.com/ixy-languages/ixy.ml.git"
+license: "LGPL-3.0"
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
+depends: [
+  "macaddr"
+  "mirage-net-lwt" {>= "2.0.0"}
+  "cstruct"
+  "ppx_cstruct"
+  "dune" {build}
+]
+available: [ocaml-version >= "4.06.0"]

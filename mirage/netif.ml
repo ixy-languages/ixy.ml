@@ -1,0 +1,84 @@
+open Lwt.Infix
+open Mirage_net
+
+type +'a io = 'a Lwt.t
+
+type t = {
+  dev : Ixy.t;
+  mempool : Ixy.Memory.mempool;
+  mutable active : bool
+}
+
+type error = [
+  | Mirage_net.Net.error
+  | `No_more_bufs of string
+]
+
+let pp_error ppf = function
+  | #Net.error as e -> Net.pp_error ppf e
+  | `No_more_bufs addr -> Fmt.pf ppf "ixy %s: no more free bufs" addr
+
+let connect pci_addr =
+  let dev = Ixy.create ~pci_addr ~rxq:1 ~txq:1 in
+  let mempool =
+    Ixy.Memory.allocate_mempool ?pre_fill:None ~num_entries:2048 in
+  Lwt.return { dev; mempool; active = true }
+
+let disconnect t =
+  t.active <- false;
+  Ixy.shutdown t.dev;
+  Lwt.return_unit
+
+type macaddr = Macaddr.t
+
+type buffer = Cstruct.t
+
+let mtu _ = 1500
+
+let write t ~size:_ fill =
+  match Ixy.Memory.pkt_buf_alloc t.mempool with
+  | None -> Lwt.return_error (`No_more_bufs t.dev.pci_addr)
+  | Some pkt ->
+    Cstruct.memset pkt.data 0;
+    let len = fill pkt.data in
+    if len > 1518 then
+      Lwt.return_error `Invalid_length
+    else begin
+      Ixy.Memory.pkt_buf_resize pkt ~size:len;
+      Ixy.tx_batch_busy_wait t.dev 0 [|pkt|];
+      Lwt.return_ok ()
+    end
+
+let rec listen t ~header_size cb =
+  if header_size > 18 then
+    Lwt.return_error `Invalid_length
+  else
+    let aux pkt =
+      let buf = Cstruct.create pkt.Ixy.Memory.size in
+      Cstruct.blit pkt.data 0 buf 0 pkt.size;
+      Ixy.Memory.pkt_buf_free pkt;
+      Lwt.async (fun () -> cb buf);
+      Lwt.return_unit in
+    if t.active then
+      let batch = Ixy.rx_batch t.dev 0 in
+      let stream = Lwt_stream.of_array batch in
+      Lwt_stream.iter_p aux stream >>= fun () ->
+      listen t ~header_size cb
+    else
+      Lwt.return_ok ()
+
+let mac { dev; _ } =
+  match Macaddr.of_bytes (Cstruct.to_string (Ixy.get_mac dev)) with
+  | Ok mac -> mac
+  | _ -> assert false
+
+let get_stats_counters { dev; _ } =
+  let { Ixy.rx_pkts; tx_pkts; rx_bytes; tx_bytes } = Ixy.get_stats dev in
+  { rx_pkts = Int32.of_int rx_pkts;
+    tx_pkts = Int32.of_int tx_pkts;
+    rx_bytes = Int64.of_int rx_bytes;
+    tx_bytes = Int64.of_int tx_bytes
+  }
+
+let reset_stats_counters { dev; _ } =
+  Ixy.reset_stats dev
