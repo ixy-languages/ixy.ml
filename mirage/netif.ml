@@ -73,9 +73,7 @@ let rec listen t ~header_size cb =
       lwt_ok_unit
 
 let mac { dev; _ } =
-  match Macaddr.of_bytes (Cstruct.to_string (Ixy.get_mac dev)) with
-  | Ok mac -> mac
-  | _ -> assert false
+  Macaddr.of_bytes_exn (Cstruct.to_string (Ixy.get_mac dev))
 
 let get_stats_counters { dev; _ } =
   let { Ixy.rx_pkts; tx_pkts; rx_bytes; tx_bytes } = Ixy.get_stats dev in
