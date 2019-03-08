@@ -38,6 +38,8 @@ type buffer = Cstruct.t
 
 let mtu _ = 1500
 
+let lwt_ok_unit = Lwt.return_ok ()
+
 let write t ~size:_ fill =
   match Ixy.Memory.pkt_buf_alloc t.mempool with
   | None -> Lwt.return_error (`No_more_bufs t.dev.pci_addr)
@@ -49,7 +51,7 @@ let write t ~size:_ fill =
     else begin
       Ixy.Memory.pkt_buf_resize pkt ~size:len;
       Ixy.tx_batch_busy_wait t.dev 0 [|pkt|];
-      Lwt.return_ok ()
+      lwt_ok_unit
     end
 
 let rec listen t ~header_size cb =
@@ -68,7 +70,7 @@ let rec listen t ~header_size cb =
       Lwt_stream.iter_p aux stream >>= fun () ->
       listen t ~header_size cb
     else
-      Lwt.return_ok ()
+      lwt_ok_unit
 
 let mac { dev; _ } =
   match Macaddr.of_bytes (Cstruct.to_string (Ixy.get_mac dev)) with
