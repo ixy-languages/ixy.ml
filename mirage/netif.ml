@@ -19,10 +19,13 @@ let pp_error ppf = function
   | `No_more_bufs addr -> Fmt.pf ppf "ixy %s: no more free bufs" addr
 
 let connect pci_addr =
-  let dev = Ixy.create ~pci_addr ~rxq:1 ~txq:1 in
-  let mempool =
-    Ixy.Memory.allocate_mempool ?pre_fill:None ~num_entries:2048 in
-  Lwt.return { dev; mempool; active = true }
+  match Ixy.PCI.of_string pci_addr with
+  | None -> Lwt.fail_with ("could not parse " ^ pci_addr)
+  | Some pci_addr ->
+    let dev = Ixy.create ~pci_addr ~rxq:1 ~txq:1 in
+    let mempool =
+      Ixy.Memory.allocate_mempool ?pre_fill:None ~num_entries:2048 in
+    Lwt.return { dev; mempool; active = true }
 
 let disconnect t =
   t.active <- false;
