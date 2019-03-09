@@ -66,8 +66,13 @@ let rec listen t ~header_size cb =
       Lwt.return_unit in
     if t.active then
       let batch = Ixy.rx_batch t.dev 0 in
-      let stream = Lwt_stream.of_array batch in
-      Lwt_stream.iter_p aux stream >>= fun () ->
+      begin
+        if Array.length batch = 0 then
+          Lwt.pause ()
+        else
+          let stream = Lwt_stream.of_array batch in
+          Lwt_stream.iter_p aux stream
+      end >>= fun () ->
       listen t ~header_size cb
     else
       lwt_ok_unit
