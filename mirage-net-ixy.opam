@@ -5,7 +5,7 @@ authors: ["Fabian Bonk"]
 homepage: "https://github.com/ixy-languages/ixy.ml"
 bug-reports: "https://github.com/ixy-languages/ixy.ml/issues"
 dev-repo: "git://github.com/ixy-languages/ixy.ml.git"
-license: "LGPL-3.0"
+license: "ISC"
 build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
@@ -18,3 +18,4 @@ depends: [
   "dune" {build}
 ]
 available: [ocaml-version >= "4.06.0"]
+synopsis: "ixy.ml implementation of the Mirage_net_lwt interface"
