@@ -262,13 +262,12 @@ let init_rx ra n =
       let rx_bufs =
         Memory.pkt_buf_alloc_batch
           mempool
-          ~num_bufs:num_rx_queue_entries
-        |> Array.of_list in
+          ~num_bufs:num_rx_queue_entries in
       { rdt = IXGBE.(register_to_reg @@ RDT i);
         rxds;
         mempool;
         rx_index = 0;
-        rx_bufs
+        rx_bufs = Array.of_list rx_bufs
       } in
     let rxqs = Array.init n init_rxq in
     (* disable no snoop *)
@@ -524,6 +523,9 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
     loop 0 in
   let bufs =
     let empty_bufs =
+      (* IMPORTANT:
+       * pkt_buf_alloc_batch may return < num_done packets.
+       * Maybe this warrants an API change. *)
       Memory.pkt_buf_alloc_batch mempool ~num_bufs:num_done in
     let receive offset new_buf =
       let index = wrap_rx (rxq.rx_index + offset) in
@@ -553,8 +555,7 @@ let tx_batch t txq_id bufs =
     for i = 0 to clean_batch - 1 do
       let buf = tx_bufs.(wrap_tx (txq.clean_index + i)) in
       let mempool = buf.Memory.mempool in
-      mempool.Memory.free_bufs.(mempool.Memory.free) <- buf;
-      mempool.Memory.free <- mempool.Memory.free + 1
+      mempool.Memory.free_bufs <- buf :: mempool.Memory.free_bufs
     done;
     txq.clean_index <- wrap_tx (txq.clean_index + clean_batch) [@@inline] in
   while (check_clean [@inlined]) () do

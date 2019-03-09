@@ -21,8 +21,7 @@ val allocate_dma : ?require_contiguous:bool -> int -> dma_memory
 type mempool = { (* not private so Ixy.tx_batch can free buffers directly *)
   entry_size : int;
   num_entries : int;
-  mutable free : int;
-  free_bufs : pkt_buf array;
+  mutable free_bufs : pkt_buf list
 }
 (** Type of a memory pool. *)
 
@@ -44,9 +43,6 @@ val allocate_mempool : ?pre_fill:Cstruct.t -> num_entries:int -> mempool
     buffers will be initialized with [data] and their length will be set to
     [data]'s length. Otherwise the [pkt_buf]s are zeroed and their initial
     size will be set to 2048. *)
-
-val num_free_bufs : mempool -> int
-(** [num_free_bufs mempool] returns the number of free buffers in [mempool]. *)
 
 val pkt_buf_alloc_batch : mempool -> num_bufs:int -> pkt_buf list
 (** [pkt_buf_alloc_batch mempool ~num_bufs] attempts to allocate [num_bufs]

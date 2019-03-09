@@ -76,8 +76,7 @@ let allocate_dma ?(require_contiguous = true) size =
 type mempool = {
   entry_size : int;
   num_entries : int;
-  mutable free : int;
-  free_bufs : pkt_buf array;
+  mutable free_bufs : pkt_buf list
 }
 
 and pkt_buf = {
@@ -91,8 +90,7 @@ let dummy =
   let dummy_pool =
     { entry_size = 0;
       num_entries = 0;
-      free = 0;
-      free_bufs = [||] (* ensure out of bounds write when freed *)
+      free_bufs = []
     } in
   { phys = 0xFFFF_FFFF_FFFF_FFFFL; (* ensure DMA error on access *)
     mempool = dummy_pool;
@@ -107,13 +105,12 @@ let allocate_mempool ?pre_fill ~num_entries =
   let { virt; _ } =
     allocate_dma ~require_contiguous:false (num_entries * entry_size) in
   Cstruct.memset virt 0; (* might not be necessary *)
-  let mempool =
+  let rec mempool =
     { entry_size;
       num_entries;
-      free = num_entries;
-      free_bufs = Array.make num_entries dummy
-    } in
-  let init_buf index =
+      free_bufs = []
+    }
+  and init_buf index =
     let data =
       Cstruct.sub virt (index * entry_size) entry_size in
     let size =
@@ -128,12 +125,8 @@ let allocate_mempool ?pre_fill ~num_entries =
       size;
       data
     } in
-  Array.iteri
-    (fun i _ -> mempool.free_bufs.(i) <- init_buf i)
-    mempool.free_bufs;
+  mempool.free_bufs <- List.init num_entries init_buf;
   mempool
-
-let num_free_bufs mempool = mempool.free
 
 let pkt_buf_alloc_batch mempool ~num_bufs =
   if num_bufs > mempool.num_entries then
@@ -141,24 +134,27 @@ let pkt_buf_alloc_batch mempool ~num_bufs =
       "can never allocate %d bufs in a mempool with %d bufs"
       num_bufs
       mempool.num_entries;
-  let n = min num_bufs mempool.free in
-  let alloc_start = mempool.free - n in
-  let bufs = List.init n (fun i -> mempool.free_bufs.(alloc_start + i)) in
-  mempool.free <- alloc_start;
-  bufs
+  let rec loop acc n =
+    if n > 0 then
+      match mempool.free_bufs with
+      | [] -> acc
+      | hd :: tl ->
+        mempool.free_bufs <- tl;
+        loop (hd :: acc) (n - 1)
+    else
+      acc in
+  loop [] num_bufs
 
 let pkt_buf_alloc mempool =
   (* doing "pkt_buf_alloc_batch mempool ~num_bufs:1" has a bit more overhead *)
-  if mempool.free > 0 then
-    let index = mempool.free - 1 in
-    mempool.free <- index;
-    Some mempool.free_bufs.(index)
-  else
-    None
+  match mempool.free_bufs with
+  | [] -> None
+  | hd :: tl ->
+    mempool.free_bufs <- tl;
+    Some hd
 
 let pkt_buf_free ({ mempool; _ } as buf) =
-  mempool.free_bufs.(mempool.free) <- buf;
-  mempool.free <- mempool.free + 1
+  mempool.free_bufs <- buf :: mempool.free_bufs
 
 let pkt_buf_resize ({ mempool; _ } as buf) ~size =
   (* MTU is fixed at 1518 by default. *)

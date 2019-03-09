@@ -27,9 +27,6 @@ module Memory : sig
       [data]'s length. Otherwise the [pkt_buf]s are zeroed and their initial
       size will be set to 2048. *)
 
-  val num_free_bufs : mempool -> int
-  (** [num_free_bufs mempool] returns the number of free buffers in [mempool]. *)
-
   type pkt_buf = private {
     phys : Cstruct.uint64;
     (** Physical address of the [data] field's underlying [Cstruct.buffer]. *)
@@ -61,10 +58,6 @@ module Memory : sig
   (** [pkt_buf_free buf] deallocates [buf] and returns it to its [mempool].
       IMPORTANT: Currently double frees are neither detected nor handled!
       Double frees will violate the [mempool]'s invariants! *)
-
-  val dummy : pkt_buf
-  (** [dummy] is a dummy [pkt_buf] that can be used to pre-fill arrays.
-      Raises [Invalid_argument] exception when freed. *)
 end
 (** Packet buffers and memory pools. *)
 
