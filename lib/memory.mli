@@ -3,7 +3,7 @@ val pagesize : int
 
 type dma_memory = private {
   virt : Cstruct.t;
-  (** DMA memory wrapped in a Cstruct.t *)
+  (** DMA memory wrapped in a Cstruct.t. *)
   physical : Cstruct.uint64
   (** Physical address of the beginning of the DMA memory buffer. *)
 }
@@ -18,14 +18,13 @@ val allocate_dma : ?require_contiguous:bool -> int -> dma_memory
     returned will have contiguous physical addresses; fails if [n] is larger
     than [huge_page_size]. *)
 
-type mempool = {
+type mempool = { (* not private so Ixy.tx_batch can free buffers directly *)
   entry_size : int;
   num_entries : int;
   mutable free : int;
   free_bufs : pkt_buf array;
 }
-(** Type of a memory pool.
-    Not private so Ixy.tx_batch can free buffers directly. *)
+(** Type of a memory pool. *)
 
 and pkt_buf = { (* not private so Ixy.rx_batch can write size directly *)
   phys : Cstruct.uint64;
@@ -66,8 +65,8 @@ val pkt_buf_resize : pkt_buf -> size:int -> unit
 
 val pkt_buf_free : pkt_buf -> unit
 (** [pkt_buf_free buf] deallocates [buf] and returns it to its [mempool].
-    IMPORTANT: Currently double frees are not detected nor handled!
-    Double frees will violate the [mempool's] invariants! *)
+    IMPORTANT: Currently double frees are neither detected nor handled!
+    Double frees will violate the [mempool]'s invariants! *)
 
 val dummy : pkt_buf
 (** [dummy] is a dummy [pkt_buf] that can be used to pre-fill arrays.

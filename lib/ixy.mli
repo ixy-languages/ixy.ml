@@ -59,8 +59,8 @@ module Memory : sig
 
   val pkt_buf_free : pkt_buf -> unit
   (** [pkt_buf_free buf] deallocates [buf] and returns it to its [mempool].
-      IMPORTANT: Currently double frees are not detected nor handled!
-      Double frees will violate the [mempool's] invariants! *)
+      IMPORTANT: Currently double frees are neither detected nor handled!
+      Double frees will violate the [mempool]'s invariants! *)
 
   val dummy : pkt_buf
   (** [dummy] is a dummy [pkt_buf] that can be used to pre-fill arrays.
