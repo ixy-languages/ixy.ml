@@ -541,15 +541,33 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
   end;
   bufs
 
+let wrap_tx index =
+  index land (num_tx_queue_entries - 1) [@@inline]
+
+let tx_single_busy_wait t txq_id buf =
+  let { tdt; txds; tx_bufs; _ } as txq = t.txqs.(txq_id) in
+  let num_empty_descriptors =
+    wrap_tx (txq.clean_index - txq.tx_index - 1) in
+  if num_empty_descriptors = 0 then begin
+    (* we know that all buffers are either dirty or unsent; no need to calculate num_dirty *)
+    while not ((TXD.dd [@inlined]) txds.(txq.clean_index)) do () done;
+    let old_buf = txq.tx_bufs.(txq.tx_index) in
+    let mempool = old_buf.Memory.mempool in
+    mempool.Memory.free_bufs <- old_buf :: mempool.Memory.free_bufs;
+    txq.clean_index <- wrap_tx (txq.clean_index + 1)
+  end;
+  tx_bufs.(txq.tx_index) <- buf;
+  (TXD.reset [@inlined]) txds.(txq.tx_index) buf;
+  txq.tx_index <- wrap_tx (txq.tx_index + 1);
+  IXGBE.set_reg_fast t.hw tdt txq.tx_index
+
 let tx_batch t txq_id bufs =
-  let wrap_tx index =
-    index land (num_tx_queue_entries - 1) [@@inline] in
   let { tdt; txds; tx_bufs; _ } as txq = t.txqs.(txq_id) in
   let clean_batch = 32 in
   (* Returns wether or not clean_batch descriptors can be cleaned. *)
   let check_clean () =
-    let cleanable = wrap_tx (txq.tx_index - txq.clean_index) in
-    cleanable >= clean_batch
+    let num_dirty = wrap_tx (txq.tx_index - txq.clean_index) in
+    num_dirty >= clean_batch
     && (TXD.dd [@inlined]) txds.(wrap_tx (txq.clean_index + clean_batch - 1)) [@@inline] in
   let clean () =
     for i = 0 to clean_batch - 1 do

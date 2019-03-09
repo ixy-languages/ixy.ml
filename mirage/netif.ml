@@ -50,7 +50,7 @@ let write t ~size:_ fill =
       Lwt.return_error `Invalid_length
     else begin
       Ixy.Memory.pkt_buf_resize pkt ~size:len;
-      Ixy.tx_batch_busy_wait t.dev 0 [pkt];
+      Ixy.tx_single_busy_wait t.dev 0 pkt;
       lwt_ok_unit
     end
 

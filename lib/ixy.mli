@@ -196,6 +196,10 @@ val rx_batch : ?batch_size:int -> t -> int -> Memory.pkt_buf list
     If [batch_size] is specified then between [0] and [batch_size] packets
     will be returned. *)
 
+val tx_single_busy_wait : t -> int -> Memory.pkt_buf -> unit
+(** [tx_batch dev queue bufs] busy waits until [buf] has been transmitted on
+    [dev]'s queue [queue] by repeatedly checking for cleanable packets. *)
+
 val tx_batch : t -> int -> Memory.pkt_buf list -> Memory.pkt_buf list
 (** [tx_batch dev queue bufs] attempts to transmit [bufs] on
     [dev]'s queue [queue]. Returns the unsent packets. *)
