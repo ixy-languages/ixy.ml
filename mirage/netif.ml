@@ -50,7 +50,7 @@ let write t ~size:_ fill =
       Lwt.return_error `Invalid_length
     else begin
       Ixy.Memory.pkt_buf_resize pkt ~size:len;
-      Ixy.tx_batch_busy_wait t.dev 0 [|pkt|];
+      Ixy.tx_batch_busy_wait t.dev 0 [pkt];
       lwt_ok_unit
     end
 
@@ -67,11 +67,10 @@ let rec listen t ~header_size cb =
     if t.active then
       let batch = Ixy.rx_batch t.dev 0 in
       begin
-        if Array.length batch = 0 then
+        if batch == [] then (* phys_equal because [] == 0 *)
           Lwt.pause ()
         else
-          let stream = Lwt_stream.of_array batch in
-          Lwt_stream.iter_p aux stream
+          Lwt_list.iter_p aux batch
       end >>= fun () ->
       listen t ~header_size cb
     else
