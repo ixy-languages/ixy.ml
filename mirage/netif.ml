@@ -59,10 +59,11 @@ let rec listen t ~header_size cb =
     Lwt.return_error `Invalid_length
   else
     let aux pkt =
-      let buf = Cstruct.create pkt.Ixy.Memory.size in
-      Cstruct.blit pkt.data 0 buf 0 pkt.size;
-      Ixy.Memory.pkt_buf_free pkt;
-      Lwt.async (fun () -> cb buf);
+      let f () =
+        cb (Cstruct.sub pkt.Ixy.Memory.data 0 pkt.Ixy.Memory.size)
+        >|= fun () ->
+        Ixy.Memory.pkt_buf_free pkt in
+      Lwt.async f;
       Lwt.return_unit in
     if t.active then
       let batch = Ixy.rx_batch t.dev 0 in
