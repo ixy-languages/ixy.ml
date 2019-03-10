@@ -13,6 +13,7 @@ depends: [
   "ixy"
   "macaddr"
   "mirage-net-lwt" {>= "2.0.0"}
+  "cstruct-lwt"
   "cstruct"
   "ppx_cstruct"
   "dune" {build}

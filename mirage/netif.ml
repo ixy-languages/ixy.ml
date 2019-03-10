@@ -41,28 +41,29 @@ let mtu _ = 1500
 let lwt_ok_unit = Lwt.return_ok ()
 
 let write t ~size:_ fill =
-  match Ixy.Memory.pkt_buf_alloc t.mempool with
+  match Ixy.Memory.pkt_buf_take t.mempool with
   | None -> Lwt.return_error (`No_more_bufs t.dev.pci_addr)
   | Some pkt ->
-    Cstruct.memset pkt.data 0;
-    let len = fill pkt.data in
-    if len > 1518 then
-      Lwt.return_error `Invalid_length
-    else begin
-      Ixy.Memory.pkt_buf_resize pkt ~size:len;
-      Ixy.tx_single_busy_wait t.dev 0 pkt;
-      lwt_ok_unit
-    end
+    match pkt.data with
+    | None -> assert false
+    | Some data ->
+      Cstruct.memset data 0;
+      let len = fill data in
+      if len > 1518 then
+        Lwt.return_error `Invalid_length
+      else begin
+        Ixy.Memory.pkt_buf_resize pkt ~size:len;
+        Ixy.tx_single_busy_wait t.dev 0 pkt;
+        lwt_ok_unit
+      end
 
 let rec listen t ~header_size cb =
   if header_size > 18 then
     Lwt.return_error `Invalid_length
   else
     let aux pkt =
-      let buf = Cstruct.create pkt.Ixy.Memory.size in
-      Cstruct.blit pkt.data 0 buf 0 pkt.size;
-      Ixy.Memory.pkt_buf_free pkt;
-      Lwt.async (fun () -> cb buf);
+      let cs = Ixy.Memory.pkt_buf_give_to_gc pkt in
+      Lwt.async (fun () -> cb cs);
       Lwt.return_unit in
     if t.active then
       let batch = Ixy.rx_batch t.dev 0 in

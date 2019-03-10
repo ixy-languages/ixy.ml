@@ -4,13 +4,15 @@ let forward batch_size rx_dev tx_dev =
   let rec touch = function
     | [] -> ()
     | hd :: tl ->
-      let data = hd.Ixy.Memory.data in
-      Cstruct.(set_uint8 data 48 (1 + get_uint8 data 48));
-      touch tl in
+      match hd.Ixy.Memory.data with
+      | None -> assert false
+      | Some data ->
+        Cstruct.(set_uint8 data 48 (1 + get_uint8 data 48));
+        touch tl in
   touch rx;
   Ixy.tx_batch tx_dev 0 rx
   (* free packets that cannot be sent immediately *)
-  |> List.iter Ixy.Memory.pkt_buf_free
+  |> List.iter Ixy.Memory.pkt_buf_give_to_mempool
 
 let usage () =
   Ixy.Log.error "Usage: %s <pci_addr> <pci_addr> [batch_size]" Sys.argv.(0)

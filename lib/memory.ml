@@ -83,7 +83,7 @@ and pkt_buf = {
   phys : Cstruct.uint64;
   mempool : mempool;
   mutable size : int;
-  data : Cstruct.t
+  mutable data : Cstruct.t option
 }
 
 let dummy =
@@ -95,7 +95,7 @@ let dummy =
   { phys = 0xFFFF_FFFF_FFFF_FFFFL; (* ensure DMA error on access *)
     mempool = dummy_pool;
     size = 0;
-    data = Cstruct.empty
+    data = None
   }
 
 let allocate_mempool ?pre_fill ~num_entries =
@@ -123,29 +123,32 @@ let allocate_mempool ?pre_fill ~num_entries =
     { phys = virt_to_phys data;
       mempool;
       size;
-      data
+      data = Some data;
     } in
   mempool.free_bufs <- List.init num_entries init_buf;
   mempool
 
-let pkt_buf_alloc_batch mempool ~num_bufs =
+let pkt_buf_take_batch mempool ~num_bufs =
   if num_bufs > mempool.num_entries then
     warn
       "can never allocate %d bufs in a mempool with %d bufs"
       num_bufs
       mempool.num_entries;
-  let rec loop acc n =
+  let rec loop acc rem n =
     if n > 0 then
-      match mempool.free_bufs with
-      | [] -> acc
+      match rem with
+      | [] ->
+        mempool.free_bufs <- rem;
+        acc
       | hd :: tl ->
-        mempool.free_bufs <- tl;
-        loop (hd :: acc) (n - 1)
-    else
-      acc in
-  loop [] num_bufs
+        loop (hd :: acc) tl (n - 1)
+    else begin
+      mempool.free_bufs <- rem;
+      acc
+    end in
+  loop [] mempool.free_bufs num_bufs
 
-let pkt_buf_alloc mempool =
+let pkt_buf_take mempool =
   (* doing "pkt_buf_alloc_batch mempool ~num_bufs:1" has a bit more overhead *)
   match mempool.free_bufs with
   | [] -> None
@@ -153,7 +156,7 @@ let pkt_buf_alloc mempool =
     mempool.free_bufs <- tl;
     Some hd
 
-let pkt_buf_free ({ mempool; _ } as buf) =
+let pkt_buf_give_to_mempool ({ mempool; _ } as buf) =
   mempool.free_bufs <- buf :: mempool.free_bufs
 
 let pkt_buf_resize ({ mempool; _ } as buf) ~size =
@@ -163,3 +166,14 @@ let pkt_buf_resize ({ mempool; _ } as buf) ~size =
     buf.size <- size
   else
     error "0 < size <= %d is not fulfilled; size = %d" upper size
+
+let pkt_buf_give_to_gc ({ data; _ } as buf) =
+  match data with
+  | None -> assert false
+  | Some sub_cs ->
+    buf.data <- None;
+    let finaliser cs =
+      buf.data <- Some cs;
+      pkt_buf_give_to_mempool buf in
+    Gc.finalise finaliser sub_cs;
+    sub_cs

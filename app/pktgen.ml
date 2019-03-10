@@ -89,11 +89,14 @@ let () =
   let seq_num = ref 0l in
   while true do
     let bufs =
-      Ixy.Memory.pkt_buf_alloc_batch mempool ~num_bufs:batch_size in
+      Ixy.Memory.pkt_buf_take_batch mempool ~num_bufs:batch_size in
     List.iter
       (fun Ixy.Memory.{ data; _ } ->
-         Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
-         seq_num := Int32.succ !seq_num)
+         match data with
+         | None -> assert false
+         | Some data ->
+           Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
+           seq_num := Int32.succ !seq_num)
       bufs;
     Ixy.tx_batch_busy_wait dev 0 bufs
   done

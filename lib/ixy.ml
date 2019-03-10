@@ -260,7 +260,7 @@ let init_rx ra n =
           ?pre_fill:None
           ~num_entries:(max mempool_size 4096) in
       let rx_bufs =
-        Memory.pkt_buf_alloc_batch
+        Memory.pkt_buf_take_batch
           mempool
           ~num_bufs:num_rx_queue_entries in
       { rdt = IXGBE.(register_to_reg @@ RDT i);
@@ -526,7 +526,7 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
       (* IMPORTANT:
        * pkt_buf_alloc_batch may return < num_done packets.
        * Maybe this warrants an API change. *)
-      Memory.pkt_buf_alloc_batch mempool ~num_bufs:num_done in
+      Memory.pkt_buf_take_batch mempool ~num_bufs:num_done in
     let receive offset new_buf =
       let index = wrap_rx (rxq.rx_index + offset) in
       let buf, rxd = rx_bufs.(index), rxds.(index) in

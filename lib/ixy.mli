@@ -34,19 +34,19 @@ module Memory : sig
     (** Mempool this packet belongs to. *)
     mutable size : int;
     (** Actual size of the payload within the [data] field. *)
-    data : Cstruct.t
+    mutable data : Cstruct.t option
     (** Packet payload; always 2048 bytes in size. *)
   }
   (** Type of a packet buffer. *)
 
-  val pkt_buf_alloc_batch : mempool -> num_bufs:int -> pkt_buf list
+  val pkt_buf_take_batch : mempool -> num_bufs:int -> pkt_buf list
   (** [pkt_buf_alloc_batch mempool ~num_bufs] attempts to allocate [num_bufs]
       packet buffers in [mempool]. If there are fewer than [num_bufs] free
       buffers in [mempool], all of them will be allocated. Errors and quits the
       program, if [num_bufs] is greater than the [mempool]'s size; this is likely
       to have happened due to a logic error. *)
 
-  val pkt_buf_alloc : mempool -> pkt_buf option
+  val pkt_buf_take : mempool -> pkt_buf option
   (** [pkt_buf_alloc mempool] attempts to allocate a single packet buffer in
       [mempool]. Returns [None] if there are no free buffers in [mempool]. *)
 
@@ -54,10 +54,13 @@ module Memory : sig
   (** [pkt_buf_resize buf ~size] attempts to resize [buf] to [size].
       Fails if [size] is negative or larger than the [mempool]'s [entry_size]. *)
 
-  val pkt_buf_free : pkt_buf -> unit
+  val pkt_buf_give_to_mempool : pkt_buf -> unit
   (** [pkt_buf_free buf] deallocates [buf] and returns it to its [mempool].
       IMPORTANT: Currently double frees are neither detected nor handled!
       Double frees will violate the [mempool]'s invariants! *)
+
+  val pkt_buf_give_to_gc : pkt_buf -> Cstruct.t
+  (** [pkt_buf_give_to_gc buf] transfers ownership of [buf] to the OCaml GC. *)
 end
 (** Packet buffers and memory pools. *)
 
