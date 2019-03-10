@@ -124,7 +124,7 @@ type rxq = private {
   (** [mempool] from which to allocate receive buffers. *)
   mutable rx_index : int;
   (** Descriptor ring tail pointer. *)
-  rx_bufs : Memory.pkt_buf array
+  rx_bufs : Memory.idx array
   (** [pkt_bufs.(i)] contains the buffer corresponding to
       [descriptors.(i)] for [0] <= [i] < [num_entries]. *)
 }

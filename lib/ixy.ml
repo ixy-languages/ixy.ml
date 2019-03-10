@@ -140,7 +140,7 @@ type rxq = {
   rxds : RXD.t array;
   mempool : Memory.mempool;
   mutable rx_index : int;
-  rx_bufs : Memory.pkt_buf array
+  rx_bufs : Memory.idx array
 }
 
 type txq = {
@@ -263,7 +263,8 @@ let init_rx ra n =
         Memory.pkt_buf_alloc_batch
           mempool
           ~num_bufs:num_rx_queue_entries
-        |> Array.of_list in
+        |> Array.of_list
+        |> Array.map (fun buf -> buf.Memory.mempool_idx) in
       { rdt = IXGBE.(register_to_reg @@ RDT i);
         rxds;
         mempool;
@@ -289,7 +290,7 @@ let start_rx t i =
     error "number of rx queue entries must be a power of 2";
   (* reset all descriptors *)
   Array.iter2
-    RXD.reset
+    (fun rxd (Memory.IDX idx) -> RXD.reset rxd (rxq.mempool.Memory.buffers.(idx)))
     rxq.rxds
     rxq.rx_bufs;
   t.ra.set_flags (IXGBE.RXDCTL i) IXGBE.RXDCTL.enable;
@@ -525,10 +526,11 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
       Memory.pkt_buf_alloc_batch mempool ~num_bufs:num_done in
     let receive offset new_buf =
       let index = wrap_rx (rxq.rx_index + offset) in
-      let buf, rxd = rx_bufs.(index), rxds.(index) in
+      let Memory.IDX idx = rx_bufs.(index) in
+      let buf, rxd = mempool.Memory.buffers.(idx), rxds.(index) in
       buf.Memory.size <- (RXD.size [@inlined]) rxd;
       (RXD.reset [@inlined]) rxd new_buf;
-      rx_bufs.(index) <- new_buf;
+      rx_bufs.(index) <- new_buf.Memory.mempool_idx;
       buf [@@inline] in
     List.mapi receive empty_bufs in
   if num_done > 0 then begin
