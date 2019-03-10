@@ -134,6 +134,8 @@ let pkt_buf_take_batch mempool ~num_bufs =
       "can never allocate %d bufs in a mempool with %d bufs"
       num_bufs
       mempool.num_entries;
+  if mempool.free_bufs = [] then
+    Gc.minor ();
   let rec loop acc rem n =
     if n > 0 then
       match rem with
