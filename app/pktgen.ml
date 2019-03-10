@@ -95,5 +95,5 @@ let () =
          Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
          seq_num := Int32.succ !seq_num)
       bufs;
-    Ixy.tx_batch_busy_wait dev 0 bufs
+    Ixy.tx_batch_busy_wait dev 0 mempool bufs
   done

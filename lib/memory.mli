@@ -18,11 +18,14 @@ val allocate_dma : ?require_contiguous:bool -> int -> dma_memory
     returned will have contiguous physical addresses; fails if [n] is larger
     than [huge_page_size]. *)
 
+type idx = IDX of int [@@unboxed]
+
 type mempool = { (* not private so Ixy.tx_batch can free buffers directly *)
   entry_size : int;
   num_entries : int;
   mutable free : int;
-  free_bufs : pkt_buf array;
+  free_bufs : idx array;
+  buffers : pkt_buf array
 }
 (** Type of a memory pool. *)
 
@@ -33,8 +36,9 @@ and pkt_buf = { (* not private so Ixy.rx_batch can write size directly *)
   (** Mempool this packet belongs to. *)
   mutable size : int;
   (** Actual size of the payload within the [data] field. *)
-  data : Cstruct.t
+  data : Cstruct.t;
   (** Packet payload; always 2048 bytes in size. *)
+  mempool_idx : idx
 }
 (** Type of a packet buffer. *)
 

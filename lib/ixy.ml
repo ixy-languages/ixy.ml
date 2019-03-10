@@ -148,7 +148,7 @@ type txq = {
   txds : TXD.t array;
   mutable clean_index : int;
   mutable tx_index : int;
-  tx_bufs : Memory.pkt_buf array
+  tx_bufs : Memory.idx array
 }
 
 type register_access = {
@@ -333,13 +333,11 @@ let init_tx ra n =
         TXD.split
           num_tx_queue_entries
           descriptor_ring.Memory.virt in
-      let tx_bufs =
-        Array.make num_tx_queue_entries Memory.dummy in
       { tdt = IXGBE.(register_to_reg @@ TDT i);
         txds;
         clean_index = 0;
         tx_index = 0;
-        tx_bufs;
+        tx_bufs = Array.make num_tx_queue_entries (Memory.IDX (-1));
       } in
     let txqs = Array.init n init_txq in
     ra.set_reg IXGBE.DMATXCTL IXGBE.DMATXCTL.te;
@@ -539,7 +537,7 @@ let rx_batch ?(batch_size = max_int) t rxq_id =
   end;
   bufs
 
-let tx_batch t txq_id bufs =
+let tx_batch t txq_id mempool bufs =
   let wrap_tx index =
     index land (num_tx_queue_entries - 1) [@@inline] in
   let { tdt; txds; tx_bufs; _ } as txq = t.txqs.(txq_id) in
@@ -551,9 +549,8 @@ let tx_batch t txq_id bufs =
     && (TXD.dd [@inlined]) txds.(wrap_tx (txq.clean_index + clean_batch - 1)) [@@inline] in
   let clean () =
     for i = 0 to clean_batch - 1 do
-      let buf = tx_bufs.(wrap_tx (txq.clean_index + i)) in
-      let mempool = buf.Memory.mempool in
-      mempool.Memory.free_bufs.(mempool.Memory.free) <- buf;
+      let mempool_idx = tx_bufs.(wrap_tx (txq.clean_index + i)) in
+      mempool.Memory.free_bufs.(mempool.Memory.free) <- mempool_idx;
       mempool.Memory.free <- mempool.Memory.free + 1
     done;
     txq.clean_index <- wrap_tx (txq.clean_index + clean_batch) [@@inline] in
@@ -569,7 +566,7 @@ let tx_batch t txq_id bufs =
       | hd :: tl ->
         let index = wrap_tx (txq.tx_index + i) in
         TXD.reset txds.(index) hd;
-        tx_bufs.(index) <- hd;
+        tx_bufs.(index) <- hd.Memory.mempool_idx;
         loop (i + 1) tl
     else
       l, num_empty_descriptors in
@@ -578,9 +575,9 @@ let tx_batch t txq_id bufs =
   IXGBE.set_reg_fast t.hw tdt txq.tx_index;
   rem
 
-let tx_batch_busy_wait t txq_id bufs =
+let tx_batch_busy_wait t txq_id mempool bufs =
   let rec send bufs =
-    let rest = tx_batch t txq_id bufs in
+    let rest = tx_batch t txq_id mempool bufs in
     if rest != [] then (* phys_equal because [] == 0 *)
       send rest in
   send bufs

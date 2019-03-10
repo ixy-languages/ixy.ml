@@ -73,18 +73,22 @@ let allocate_dma ?(require_contiguous = true) size =
     physical;
   { virt; physical }
 
+type idx = IDX of int [@@unboxed]
+
 type mempool = {
   entry_size : int;
   num_entries : int;
   mutable free : int;
-  free_bufs : pkt_buf array;
+  free_bufs : idx array;
+  buffers : pkt_buf array
 }
 
 and pkt_buf = {
   phys : Cstruct.uint64;
   mempool : mempool;
   mutable size : int;
-  data : Cstruct.t
+  data : Cstruct.t;
+  mempool_idx : idx
 }
 
 let dummy =
@@ -92,12 +96,14 @@ let dummy =
     { entry_size = 0;
       num_entries = 0;
       free = 0;
-      free_bufs = [||] (* ensure out of bounds write when freed *)
+      free_bufs = [||]; (* ensure out of bounds write when freed *)
+      buffers = [||]
     } in
   { phys = 0xFFFF_FFFF_FFFF_FFFFL; (* ensure DMA error on access *)
     mempool = dummy_pool;
     size = 0;
-    data = Cstruct.empty
+    data = Cstruct.empty;
+    mempool_idx = IDX (-1)
   }
 
 let allocate_mempool ?pre_fill ~num_entries =
@@ -111,7 +117,8 @@ let allocate_mempool ?pre_fill ~num_entries =
     { entry_size;
       num_entries;
       free = num_entries;
-      free_bufs = Array.make num_entries dummy
+      free_bufs = Array.make num_entries (IDX (-1));
+      buffers = Array.make num_entries dummy
     } in
   let init_buf index =
     let data =
@@ -126,10 +133,14 @@ let allocate_mempool ?pre_fill ~num_entries =
     { phys = virt_to_phys data;
       mempool;
       size;
-      data
+      data;
+      mempool_idx = IDX index
     } in
   Array.iteri
-    (fun i _ -> mempool.free_bufs.(i) <- init_buf i)
+    (fun i _ ->
+       let buf = init_buf i in
+       mempool.free_bufs.(i) <- IDX i;
+       mempool.buffers.(i) <- buf)
     mempool.free_bufs;
   mempool
 
@@ -143,21 +154,25 @@ let pkt_buf_alloc_batch mempool ~num_bufs =
       mempool.num_entries;
   let n = min num_bufs mempool.free in
   let alloc_start = mempool.free - n in
-  let bufs = List.init n (fun i -> mempool.free_bufs.(alloc_start + i)) in
+  let bufs =
+    List.init n (fun i ->
+        let IDX idx = mempool.free_bufs.(alloc_start + i) in
+        mempool.buffers.(idx)) in
   mempool.free <- alloc_start;
   bufs
 
 let pkt_buf_alloc mempool =
   (* doing "pkt_buf_alloc_batch mempool ~num_bufs:1" has a bit more overhead *)
-  if mempool.free > 0 then
+  if mempool.free > 0 then begin
     let index = mempool.free - 1 in
     mempool.free <- index;
-    Some mempool.free_bufs.(index)
-  else
+    let IDX idx = mempool.free_bufs.(index) in
+    Some mempool.buffers.(idx)
+  end else
     None
 
 let pkt_buf_free ({ mempool; _ } as buf) =
-  mempool.free_bufs.(mempool.free) <- buf;
+  mempool.free_bufs.(mempool.free) <- buf.mempool_idx;
   mempool.free <- mempool.free + 1
 
 let pkt_buf_resize ({ mempool; _ } as buf) ~size =

@@ -17,6 +17,8 @@ module Memory : sig
   val pagesize : int
   (** [pagesize] is the size of a system page in bytes. *)
 
+  type idx
+
   type mempool
   (** Type of a memory pool. *)
 
@@ -37,8 +39,9 @@ module Memory : sig
     (** Mempool this packet belongs to. *)
     mutable size : int;
     (** Actual size of the payload within the [data] field. *)
-    data : Cstruct.t
+    data : Cstruct.t;
     (** Packet payload; always 2048 bytes in size. *)
+    mempool_idx : idx
   }
   (** Type of a packet buffer. *)
 
@@ -135,7 +138,7 @@ type txq = private {
   (** Pointer to first unclean descriptor. *)
   mutable tx_index : int;
   (** Descriptor ring tail pointer. *)
-  tx_bufs : Memory.pkt_buf array
+  tx_bufs : Memory.idx array
   (** [pkt_bufs.(i)] contains the buffer corresponding to
       [descriptors.(i)] for [0] <= [i] < [num_entries].
       Initially filled with [Memory.dummy]. *)
@@ -203,11 +206,11 @@ val rx_batch : ?batch_size:int -> t -> int -> Memory.pkt_buf list
     If [batch_size] is specified then between [0] and [batch_size] packets
     will be returned. *)
 
-val tx_batch : t -> int -> Memory.pkt_buf list -> Memory.pkt_buf list
+val tx_batch : t -> int -> Memory.mempool -> Memory.pkt_buf list -> Memory.pkt_buf list
 (** [tx_batch dev queue bufs] attempts to transmit [bufs] on
     [dev]'s queue [queue]. Returns the unsent packets. *)
 
-val tx_batch_busy_wait : t -> int -> Memory.pkt_buf list -> unit
+val tx_batch_busy_wait : t -> int -> Memory.mempool -> Memory.pkt_buf list -> unit
 (** [tx_batch_busy_wait dev queue bufs] busy waits until all [bufs]
     have been transmitted on [dev]'s queue [queue] by repeatedly calling
     [tx_batch]. *)

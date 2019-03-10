@@ -8,7 +8,7 @@ let forward batch_size rx_dev tx_dev =
       Cstruct.(set_uint8 data 48 (1 + get_uint8 data 48));
       touch tl in
   touch rx;
-  Ixy.tx_batch tx_dev 0 rx
+  Ixy.tx_batch tx_dev 0 rx_dev.Ixy.rxqs.(0).Ixy.mempool rx
   (* free packets that cannot be sent immediately *)
   |> List.iter Ixy.Memory.pkt_buf_free
 
