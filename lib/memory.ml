@@ -24,22 +24,25 @@ let mlock Cstruct.{ buffer; off; len } =
 let virt_to_phys virt =
   if Obj.is_int (Obj.repr virt) then
     raise (Invalid_argument "virt must be a pointer");
-  let fd = Unix.(openfile "/proc/self/pagemap" [O_RDONLY] 0o644) in
-  let addr = int64_of_addr virt in
-  let offset = (Int64.to_int addr) / pagesize * 8 in
-  if Unix.(lseek fd offset SEEK_SET <> offset) then
-    error "lseek unsuccessful";
-  let buf = Bytes.create 8 in
-  if Unix.(read fd buf 0 8 <> 8) then
-    error "read unsuccessful";
-  Unix.close fd;
-  let phys =
-    Cstruct.(LE.get_uint64 (of_bytes buf) 0) in
-  let pagesize = Int64.of_int pagesize in
-  let offset =
-    let x = Int64.rem addr pagesize in
-    if x < 0L then Int64.add x pagesize else x in
-  Int64.(add (mul (logand phys 0x7F_FFFF_FFFF_FFFFL) pagesize) offset)
+  if Util.simulated <> None then
+    int64_of_addr virt
+  else
+    let fd = Unix.(openfile "/proc/self/pagemap" [O_RDONLY] 0o644) in
+    let addr = int64_of_addr virt in
+    let offset = (Int64.to_int addr) / pagesize * 8 in
+    if Unix.(lseek fd offset SEEK_SET <> offset) then
+      error "lseek unsuccessful";
+    let buf = Bytes.create 8 in
+    if Unix.(read fd buf 0 8 <> 8) then
+      error "read unsuccessful";
+    Unix.close fd;
+    let phys =
+      Cstruct.(LE.get_uint64 (of_bytes buf) 0) in
+    let pagesize = Int64.of_int pagesize in
+    let offset =
+      let x = Int64.rem addr pagesize in
+      if x < 0L then Int64.add x pagesize else x in
+    Int64.(add (mul (logand phys 0x7F_FFFF_FFFF_FFFFL) pagesize) offset)
 
 let huge_page_id = ref 0
 
@@ -55,8 +58,14 @@ let allocate_dma ?(require_contiguous = true) size =
   if require_contiguous && size > huge_page_size then
     error "cannot map contiguous memory";
   let pid = Unix.getpid () in
+  let filename =
+    Printf.sprintf "ixy.ml-%d-%d" pid !huge_page_id in
   let path =
-    Printf.sprintf "/mnt/huge/ixy.ml-%d-%d" pid !huge_page_id in
+    let dir =
+      match Util.simulated with
+      | None -> "/mnt/huge/"
+      | Some path -> path in
+    dir ^ filename in
   incr huge_page_id;
   let fd = Unix.(openfile path [O_CREAT; O_RDWR] 0o777) in
   Unix.ftruncate fd size;
@@ -64,14 +73,18 @@ let allocate_dma ?(require_contiguous = true) size =
   assert (Cstruct.len virt = size); (* TODO maybe remove this later? *)
   mlock virt;
   Unix.close fd;
-  Unix.unlink path;
-  let physical = virt_to_phys virt in
+  let phys = virt_to_phys virt in
+  begin match Util.simulated with
+    | None -> Unix.unlink path
+    | Some sim_path ->
+      Unix.rename path (sim_path ^ (Printf.sprintf "ixy.ml-%#018Lx" phys))
+  end;
   debug
     "allocated %#x bytes of dma memory at virt %#018Lx, phys %#018Lx"
     size
     (int64_of_addr virt)
-    physical;
-  { virt; physical }
+    phys;
+  { virt; physical = phys }
 
 type mempool = {
   entry_size : int;

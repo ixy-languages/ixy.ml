@@ -1,5 +1,7 @@
 let forward batch_size rx_dev tx_dev =
   let rx = Ixy.rx_batch ?batch_size rx_dev 0 in
+  if rx <> [] then
+    Ixy.Log.info "got packets";
   (* touch all received packets *)
   let rec touch = function
     | [] -> ()

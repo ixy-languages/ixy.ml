@@ -180,7 +180,7 @@ type t = {
 
 let () =
   if Sys.os_type <> "Unix" || Uname.sysname <> "Linux" then
-    error "ixy.ml only works on Linux"
+    warn "ixy.ml only works on Linux"
   else if Sys.word_size <> 64 then
     error "ixy.ml only works on 64 bit systems"
   else if Sys.big_endian then
@@ -372,6 +372,7 @@ let check_link t =
   (speed, link_up)
 
 let wait_for_link t =
+  info "waiting for link";
   let max_wait = 10. in
   let poll_interval = 0.01 in
   let rec loop rem =
@@ -418,41 +419,53 @@ let reset_stats t =
   stats.rx_bytes <- 0;
   stats.tx_bytes <- 0
 
+let verify_pci_config pci_addr =
+  let PCI.{ vendor; device_id; class_code; subclass; prog_if } =
+    PCI.get_config pci_addr in
+  let pci_addr_str = PCI.to_string pci_addr in
+  info "device %s has device id %#x" pci_addr_str device_id;
+  match class_code, subclass, prog_if, vendor with
+  | 0x2, 0x0, 0x0, v when v = PCI.vendor_intel -> ()
+  | 0x1, 0x0, 0x0, v when v = PCI.vendor_intel ->
+    error
+      "device %s is configured as SCSI storage device in EEPROM"
+      pci_addr_str
+  | 0x2, 0x0, _, v when v <> PCI.vendor_intel ->
+    error
+      "device %s is a non-Intel NIC (vendor: %#x)"
+      pci_addr_str
+      vendor
+  | 0x2, _, _, _ ->
+    error
+      "device %s is not an Ethernet NIC (subclass: %#x)"
+      pci_addr_str
+      subclass
+  | _ ->
+    error
+      "device %s is not a NIC (class: %#x)"
+      pci_addr_str
+      class_code
+
 let create ~pci_addr ~rxq ~txq =
+  begin match Util.simulated with
+    | Some path ->
+      info "using ixy-simulator at %s" path
+    | None -> ()
+  end;
   if Unix.getuid () <> 0 then
     warn "not running as root, this will probably fail";
   if rxq > max_queues then
     error "cannot configure %d rx queues (max: %d)" rxq max_queues;
   if txq > max_queues then
     error "cannot configure %d tx queues (max: %d)" txq max_queues;
-  let PCI.{ vendor; device_id; class_code; subclass; prog_if } =
-    PCI.get_config pci_addr in
   let pci_addr_str = PCI.to_string pci_addr in
-  begin match class_code, subclass, prog_if, vendor with
-    | 0x2, 0x0, 0x0, v when v = PCI.vendor_intel -> ()
-    | 0x1, 0x0, 0x0, v when v = PCI.vendor_intel ->
-      error
-        "device %s is configured as SCSI storage device in EEPROM"
-        pci_addr_str
-    | 0x2, 0x0, _, v when v <> PCI.vendor_intel ->
-      error
-        "device %s is a non-Intel NIC (vendor: %#x)"
-        pci_addr_str
-        vendor
-    | 0x2, _, _, _ ->
-      error
-        "device %s is not an Ethernet NIC (subclass: %#x)"
-        pci_addr_str
-        subclass
-    | _ ->
-      error
-        "device %s is not a NIC (class: %#x)"
-        pci_addr_str
-        class_code
-  end;
-  info "device %s has device id %#x" pci_addr_str device_id;
   let hw =
-    PCI.map_resource pci_addr in
+    match Util.simulated with
+    | None ->
+      verify_pci_config pci_addr;
+      PCI.map_resource pci_addr
+    | Some sim_path ->
+      PCI.simulated_hw sim_path pci_addr in
   let ra =
     { get_reg = IXGBE.get_reg hw;
       set_reg = IXGBE.set_reg hw;

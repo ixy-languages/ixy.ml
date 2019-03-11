@@ -7,3 +7,13 @@ let mmap fd =
   let genarray =
     Bigarray.(Unix.map_file fd char c_layout true [|-1|]) in
   Cstruct.of_bigarray (Bigarray.array1_of_genarray genarray)
+
+let simulated =
+  match Unix.getenv "IXY_SIMULATED" with
+  | "" -> None
+  | exception Not_found -> None
+  | path ->
+    if path.[String.length path - 1] = '/' then
+      Some path
+    else
+      Some (path ^ "/")

@@ -47,6 +47,12 @@ let map_resource t =
   Unix.close fd;
   hw
 
+let simulated_hw sim_path t =
+  let path = Printf.sprintf "%s%s/%s" sim_path t "resource0" in
+  let fd = Unix.(openfile path [O_RDWR] 0o644) in
+  Bigarray.(Unix.map_file fd char c_layout true [|-1|])
+  |> Bigarray.array1_of_genarray
+
 type pci_config = {
   vendor : int;
   device_id : int;

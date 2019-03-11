@@ -15,6 +15,9 @@ type hw =
 val map_resource : t -> hw
 (** [map_resource pci_addr] maps [pci_addr]'s register file. *)
 
+val simulated_hw : string -> t -> hw
+(** [simulated_hw sim_path pci_addr] maps a simulated register file. *)
+
 type pci_config = private {
   vendor : int;
   device_id : int;
