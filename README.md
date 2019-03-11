@@ -243,7 +243,7 @@ The ixy.ml project is structured as follows:
 
 ## License
 
-ixy.ml is licensed under the terms of the [LGPL Version 3.0](https://www.gnu.org/licenses/lgpl-3.0.en.html) (see [`LICENSE`](./LICENSE)).
+ixy.ml is licensed under the terms of the [ISC License](https://opensource.org/licenses/ISC) (see [`LICENSE`](./LICENSE)).
 
 ## Disclaimer
 
