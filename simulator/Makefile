@@ -1,5 +1,5 @@
 all:
-	cc simulator.c -o simulator
+	cc simulator.c -o simulator -pthread -O3
 
 clean:
-	rm *.o simulator
+	rm simulator

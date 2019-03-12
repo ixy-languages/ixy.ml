@@ -452,7 +452,7 @@ let create ~pci_addr ~rxq ~txq =
       info "using ixy-simulator at %s" path
     | None -> ()
   end;
-  if Unix.getuid () <> 0 then
+  if Unix.getuid () <> 0 && Util.simulated <> None then
     warn "not running as root, this will probably fail";
   if rxq > max_queues then
     error "cannot configure %d rx queues (max: %d)" rxq max_queues;
