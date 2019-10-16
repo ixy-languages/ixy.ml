@@ -179,12 +179,14 @@ type t = {
 }
 
 let () =
-  if Sys.os_type <> "Unix" || Uname.sysname <> "Linux" then
-    warn "ixy.ml only works on Linux"
-  else if Sys.word_size <> 64 then
-    error "ixy.ml only works on 64 bit systems"
-  else if Sys.big_endian then
-    error "ixy.ml only works on little endian systems"
+  if Util.simulated <> None then begin
+    if Sys.os_type <> "Unix" || Uname.sysname <> "Linux" then
+      error "ixy.ml only works on Linux"
+    else if Sys.word_size <> 64 then
+      error "ixy.ml only works on 64 bit systems"
+    else if Sys.big_endian then
+      error "ixy.ml only works on little endian systems"
+  end
 
 let disable_interrupts ra =
   info "disabling interrupts";
@@ -562,7 +564,8 @@ let tx_single_busy_wait t txq_id buf =
   let num_empty_descriptors =
     wrap_tx (txq.clean_index - txq.tx_index - 1) in
   if num_empty_descriptors = 0 then begin
-    (* we know that all buffers are either dirty or unsent; no need to calculate num_dirty *)
+    (* we know that all buffers are either dirty or unsent;
+     * no need to calculate num_dirty *)
     while not ((TXD.dd [@inlined]) txds.(txq.clean_index)) do () done;
     let old_buf = txq.tx_bufs.(txq.tx_index) in
     let mempool = old_buf.Memory.mempool in

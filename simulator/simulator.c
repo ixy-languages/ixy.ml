@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <string.h>
+#include <sys/posix_shm.h>
 
 #include "log.h"
 #include "regs.h"
@@ -21,7 +22,7 @@
 char *progname;
 
 void usage() {
-    printf("Usage: %s <pci_addresses>", progname);
+    printf("Usage: %s <pci_addresses>\n", progname);
     exit(1);
 }
 
@@ -32,7 +33,7 @@ void mysleep(long secs, long nsecs) {
     } while (rem.tv_sec != 0 && rem.tv_nsec != 0);
 }
 
-#define SIM_PATH "/Volumes/RAMDisk/"
+#define SIM_PATH "/tmp/s/"
 #define IXY_PREFIX "ixy.ml-0x"
 
 void clean(void) {
@@ -144,7 +145,7 @@ void *rxq_thread(void *args) {
     snprintf(ring_path, PATH_MAX, SIM_PATH IXY_PREFIX "%016lx", desc_addr);
     info("mapping %s", ring_path);
     mysleep(3, 0);
-    if ((info->ring_fd = open(ring_path, O_RDWR, S_IRWXU)))
+    if ((info->ring_fd = shm_open(ring_path, O_RDWR, S_IRWXU)))
         error("could not open %s '%s'", ring_path, strerror(errno));
     int rdlen = get_reg32(regs, IXGBE_RDLEN(id));
 
@@ -182,11 +183,19 @@ void *nic_thread(void *args) {
     char *reg_path = nic->reg_path;
     snprintf(reg_path, PATH_MAX, "%s/resource0", nic->dir_path);
     int reg_fd;
-    if ((reg_fd = open(reg_path, O_CREAT | O_RDWR, S_IRWXU)) == -1)
-        error("could not open %s", reg_path);
+    if ((reg_fd = shm_open(reg_path, O_CREAT | O_RDWR | O_EXCL, S_IRWXU)) == -1) {
+        if (strlen(reg_path) > PSHMNAMLEN) {
+            warn("SIM_PATH exceeds PSHMNAMLEN (%d)", PSHMNAMLEN);
+#ifdef __APPLE__
+            warn("macOS has a super-short PSHMNAMLEN (%d)", PSHMNAMLEN);
+            warn("maybe use something like '/tmp/s/' as SIM_PATH");
+#endif
+        }
+        error("could not open %s (%s)", reg_path, strerror(errno));
+    }
 
     if (ftruncate(reg_fd, REGISTER_SIZE))
-        error("could not resize %s", reg_path);
+        error("could not resize %s (%s)", reg_path, strerror(errno));
 
     if ((nic->regs = (uint8_t *) mmap(NULL, REGISTER_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, reg_fd, 0)) == MAP_FAILED)
         error("could not mmap %s", reg_path);
@@ -251,9 +260,6 @@ int main(int argc, char **argv) {
     progname = argv[0];
     if (argc < 2)
         usage();
-
-    warn("make sure to run this simulator on a memory-backed filesystem");
-    warn("otherwise this will chew through your SSD and/or be slow");
 
     clean();
 
