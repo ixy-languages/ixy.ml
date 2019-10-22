@@ -9,7 +9,7 @@ ixy refers to the [original C implementation by Paul Emmerich](https://github.co
 ## Thread-safety
 
 ixy.ml is **not** thread-safe.
-Invariants for each queue are only guaranteed to hold between calls to `rx_burst`/`tx_burst`.
+Invariants for each queue are only guaranteed to hold between calls to `rx_batch`/`tx_batch`.
 Memory pools are not locked during operation; multiple threads must not allocate/free buffers in the same pool at the same time.
 
 ## ixy vs ixy.ml packet buffers
