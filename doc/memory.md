@@ -14,9 +14,9 @@ Memory pools are not locked during operation; multiple threads must not allocate
 
 ## ixy vs ixy.ml packet buffers
 
-By default ixy allocates `4096 * 2 KiB = 16 MiB` for each rx queue's mempool.
+By default ixy allocates `4096 * 2 KiB = 8 MiB` for each rx queue's mempool.
 This memory is not physically contiguous, as it doesn't fit into the 2 MiB huge pages used by ixy.
-Theoretically each mempool should consume exactly 8 huge pages.
+Theoretically each mempool should consume exactly 4 huge pages.
 Back-to-back within this memory there are packet buffers:
 
 ```
