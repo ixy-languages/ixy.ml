@@ -12,10 +12,11 @@ build: [
 depends: [
   "ixy"
   "macaddr"
-  "mirage-net-lwt" {>= "2.0.0"}
+  "mirage-net"
   "cstruct"
   "ppx_cstruct"
+  "cstruct-lwt"
   "dune" {build}
 ]
 available: [ocaml-version >= "4.06.0"]
-synopsis: "ixy.ml implementation of the Mirage_net_lwt interface"
+synopsis: "ixy.ml implementation of the Mirage_net.S interface"
