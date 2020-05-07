@@ -1,5 +1,5 @@
 (library
  (name mirage_net_ixy)
  (public_name mirage-net-ixy)
- (libraries macaddr cstruct cstruct-lwt lwt.unix mirage-net-lwt ixy)
+ (libraries macaddr cstruct cstruct-lwt lwt.unix mirage-net ixy)
  (wrapped false))

@@ -1,7 +1,7 @@
 (executable
  (name check_nic)
  (modes native)
- (libraries core cstruct ixy)
+ (libraries cstruct ixy)
  (flags :standard -w A-42-44)
  (ocamlopt_flags -O3)
  (modules check_nic))

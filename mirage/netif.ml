@@ -1,8 +1,6 @@
 open Lwt.Infix
 open Mirage_net
 
-type +'a io = 'a Lwt.t
-
 type t = {
   dev : Ixy.t;
   mempool : Ixy.Memory.mempool;
@@ -31,10 +29,6 @@ let disconnect t =
   t.active <- false;
   Ixy.shutdown t.dev;
   Lwt.return_unit
-
-type macaddr = Macaddr.t
-
-type buffer = Cstruct.t
 
 let mtu _ = 1500
 
@@ -78,7 +72,7 @@ let rec listen t ~header_size cb =
       lwt_ok_unit
 
 let mac { dev; _ } =
-  Macaddr.of_bytes_exn (Cstruct.to_string (Ixy.get_mac dev))
+  Macaddr.of_octets_exn (Cstruct.to_string (Ixy.get_mac dev))
 
 let get_stats_counters { dev; _ } =
   let { Ixy.rx_pkts; tx_pkts; rx_bytes; tx_bytes } = Ixy.get_stats dev in
