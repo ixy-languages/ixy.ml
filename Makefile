@@ -1,4 +1,4 @@
-TEST=check_nic uname pci_config blink parse_pci_addr pagesize
+TEST=check_nic pci_config blink parse_pci_addr pagesize
 
 all:
 	dune build @install

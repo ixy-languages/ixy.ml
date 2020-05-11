@@ -10,14 +10,7 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
 depends: [
-  "ocaml" { >= "4.06.0" }
-  "ixy-core"
-  "macaddr"
-  "mirage"
-  "mirage-net"
-  "mirage-pci"
-  "cstruct"
   "ppx_cstruct"
   "dune" {build}
 ]
-synopsis: "The ixy.ml implementation of the Mirage_net.S interface"
+synopsis: "The ixy.ml network driver"

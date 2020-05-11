@@ -192,20 +192,3 @@ type reg
 val register_to_reg : register -> reg
 
 val register_to_string : register -> string
-
-external get_reg_fast : PCI.hw -> reg -> int = "ixy_get_reg32" [@@noalloc]
-
-external set_reg_fast :
-  PCI.hw -> reg -> int -> unit = "ixy_set_reg32" [@@noalloc]
-
-val get_reg : PCI.hw -> register -> int
-
-val set_reg : PCI.hw -> register -> int -> unit
-
-val set_flags : PCI.hw -> register -> int -> unit
-
-val clear_flags : PCI.hw -> register -> int -> unit
-
-val wait_set : PCI.hw -> register -> int -> unit
-
-val wait_clear : PCI.hw -> register -> int -> unit

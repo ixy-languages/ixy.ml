@@ -322,30 +322,3 @@ let register_to_string register =
   | GOTCH -> "GOTCH"
   | RAL i -> sprintf "RAL[%d]" i
   | RAH i -> sprintf "RAH[%d]" i
-
-external get_reg_fast : PCI.hw -> reg -> int = "ixy_get_reg32" [@@noalloc]
-
-external set_reg_fast :
-  PCI.hw -> reg -> int -> unit = "ixy_set_reg32" [@@noalloc]
-
-let get_reg hw register =
-  get_reg_fast hw (register_to_reg register)
-
-let set_reg hw register data =
-  set_reg_fast hw (register_to_reg register) data
-
-let set_flags hw register flags =
-  set_reg hw register ((get_reg hw register) lor flags)
-
-let clear_flags hw register flags =
-  set_reg hw register ((get_reg hw register) land (lnot flags))
-
-let wait_clear hw register mask =
-  while (get_reg hw register) land mask <> 0 do
-    Unix.sleepf 0.01
-  done
-
-let wait_set hw register mask =
-  while (get_reg hw register) land mask <> mask do
-    Unix.sleepf 0.01
-  done
