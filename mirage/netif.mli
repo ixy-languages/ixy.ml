@@ -1,3 +1,5 @@
-include Mirage_net.S
+module Make (Pci : Mirage_pci.S) : sig
+  include Mirage_net.S
 
-val connect : string -> t Lwt.t
+  val connect : Pci.t -> t Lwt.t
+end

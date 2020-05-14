@@ -1,5 +1,7 @@
 (library
  (name mirage_net_ixy)
  (public_name mirage-net-ixy)
- (libraries macaddr cstruct cstruct-lwt lwt.unix mirage-net ixy)
+ (libraries macaddr cstruct mirage mirage-net mirage-pci ixy-core)
+ (flags :standard -w A-42-44-45)
+ (ocamlopt_flags -O3)
  (wrapped false))

@@ -1,12 +1,10 @@
-(ocamllex pCI_addr)
-
 (library
- (name ixy)
- (public_name ixy)
+ (name ixy_core)
+ (public_name ixy-core)
  (preprocess (pps ppx_cstruct))
  (libraries unix)
  ; -42 because we don't target <4.06.0
- ; -44 because I don't care about shadowing
- (flags :standard -w A-42-44)
+ ; -44-45 because I don't care about shadowing
+ (flags :standard -w A-42-44-45)
  (ocamlopt_flags -O3)
- (c_names uname memory))
+ (foreign_stubs (language c) (names stubs)))

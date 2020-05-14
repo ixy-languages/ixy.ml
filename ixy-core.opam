@@ -1,5 +1,5 @@
-opam-version: "1.2"
-version: "0.0.1"
+opam-version: "2.0"
+version: "0.2.0"
 maintainer: "mail@fabianbonk.de"
 authors: ["Fabian Bonk"]
 homepage: "https://github.com/ixy-languages/ixy.ml"
@@ -13,5 +13,4 @@ depends: [
   "ppx_cstruct"
   "dune" {build}
 ]
-available: [ocaml-version >= "4.06.0"]
 synopsis: "The ixy.ml network driver"

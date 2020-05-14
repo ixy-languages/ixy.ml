@@ -1,0 +1,11 @@
+(ocamllex pci_addr)
+
+(library
+ (name ixy_freestanding)
+ (public_name ixy-freestanding)
+ (preprocess (pps ppx_cstruct))
+ (libraries ixy-core unix)
+ (wrapped false)
+ (flags :standard -w A-42-44-45)
+ (ocamlopt_flags -O3)
+ (foreign_stubs (language c) (names memory)))

@@ -72,18 +72,19 @@ let pkt_data =
   buf (* rest of the payload is zero-filled *)
 
 let usage () =
-  Ixy.Log.error "Usage: %s <pci_addr>" Sys.argv.(0)
+  Ixy_core.Log.error "Usage: %s <pci_addr>" Sys.argv.(0)
 
 let () =
   if Array.length Sys.argv <> 2 then
     usage ();
-  let pci_addr =
-    match Ixy.PCI.of_string Sys.argv.(1) with
+  let pci =
+    match Ixy.of_string Sys.argv.(1) with
     | None -> usage ()
     | Some pci -> pci in
-  let dev = Ixy.create ~pci_addr ~rxq:0 ~txq:1 in
+  let dev = Ixy.create ~pci ~rxq:0 ~txq:1 in
   let mempool =
     Ixy.Memory.allocate_mempool
+      dev.Ixy.pci
       ~pre_fill:pkt_data
       ~num_entries:2048 in
   let seq_num = ref 0l in
@@ -91,7 +92,7 @@ let () =
     let bufs =
       Ixy.Memory.pkt_buf_alloc_batch mempool ~num_bufs:batch_size in
     Array.iter
-      (fun Ixy.Memory.{ data; _ } ->
+      (fun Ixy_core.Ixy_memory.{ data; _ } ->
          Cstruct.BE.set_uint32 data (packet_size - 4) !seq_num;
          seq_num := Int32.succ !seq_num)
       bufs;

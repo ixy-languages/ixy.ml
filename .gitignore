@@ -1,3 +1,7 @@
 _build
 *.install
 *.merlin
+
+unikernel/*/*
+!unikernel/*/unikernel.ml
+!unikernel/*/config.ml
