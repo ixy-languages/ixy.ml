@@ -67,7 +67,10 @@ module Make (Pci : Mirage_pci.S) = struct
             if Array.length batch = 0 then
               Lwt.pause ()
             else
-              Array.fold_left (fun acc v -> acc >>= fun () -> recv v) Lwt.return_unit batch
+              Array.fold_left
+                (fun acc v -> acc >>= fun () -> recv v)
+                Lwt.return_unit
+                batch
           end >>= aux
         else
           lwt_ok_unit in
