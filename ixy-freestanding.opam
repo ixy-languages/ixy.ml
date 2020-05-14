@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "0.0.1"
+version: "0.2.0"
 maintainer: "mail@fabianbonk.de"
 authors: ["Fabian Bonk"]
 homepage: "https://github.com/ixy-languages/ixy.ml"
