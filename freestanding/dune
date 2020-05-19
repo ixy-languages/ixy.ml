@@ -8,4 +8,4 @@
  (wrapped false)
  (flags :standard -w A-42-44-45)
  (ocamlopt_flags -O3)
- (foreign_stubs (language c) (names memory)))
+ (foreign_stubs (language c) (names memory stubs libixy-vfio)))
