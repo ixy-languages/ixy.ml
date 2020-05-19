@@ -21,6 +21,6 @@ let pci0 =
   pcidev device_info "pci0"
 
 let () =
-  register "pci" [
+  register "echo" [
     main $ pci0
   ] ~packages:[ package "ixy-core"; package "mirage-net-ixy" ]
