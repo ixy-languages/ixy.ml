@@ -573,7 +573,7 @@ module Make (Pci : Ixy_pci.S) = struct
       index land (num_tx_queue_entries - 1) [@@inline] in
     let { tdt; txds; tx_bufs; _ } as txq = t.txqs.(txq_id) in
     let clean_batch = 32 in
-    (* Returns wether or not clean_batch descriptors can be cleaned. *)
+    (* Returns whether or not clean_batch descriptors can be cleaned. *)
     let check_clean () =
       let cleanable = wrap_tx (txq.tx_index - txq.clean_index) in
       cleanable >= clean_batch
