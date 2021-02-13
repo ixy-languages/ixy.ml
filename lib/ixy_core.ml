@@ -354,7 +354,7 @@ module Make (Pci : Ixy_pci.S) = struct
         let txdctl_old =
           ra.get_reg (IXGBE.TXDCTL i) in
         let txdctl_magic_bits =
-          (txdctl_old land ((lnot 0x3F) lor ((0x3F lsl 8) lor (0x3F lsl 16))))
+          (txdctl_old land ((lnot 0x7F) lor ((0x7F lsl 8) lor (0x7F lsl 16))))
           lor (36 lor ((8 lsl 8) lor (4 lsl 16))) in
         ra.set_reg (IXGBE.TXDCTL i) txdctl_magic_bits;
         let txds =
